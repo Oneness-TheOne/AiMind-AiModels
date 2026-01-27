@@ -3,7 +3,7 @@ from pathlib import Path
 import easyocr
 from PIL import Image, ImageDraw
 
-path = Path(__file__).parent / "test1.png" # 파일 경로 출력
+path = Path(__file__).parent / "img1.jpg" # 파일 경로 출력
 reader = easyocr.Reader(["ko", "en"], verbose=False) # verbose=False : 불필요한 메세지 생략
 # parsed = reader.readtext(str(path)) # 경로에 한국말이 있으면 오류 가능성 있음
 parsed = reader.readtext(path.read_bytes()) # 오류 줄이기에 좋음
