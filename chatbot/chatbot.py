@@ -9,6 +9,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableParallel, RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
+from langchain_community.document_loaders import TextLoader
 
 
 # textfile loader 무거운 버전(전처리 필요할 경우)
@@ -21,9 +22,12 @@ from langchain_community.document_loaders import TextLoader
 # 문자열로 경로 직접 지정 (r을 붙여야 역슬래시 인식이 잘 됩니다)
 load_dotenv(r"..\Back\.env")
 api_key = os.getenv("GOOGLE_API_KEY")
+print(f"로드된 API 키 존재 여부: {'예' if api_key else '아니오'}")
 
 # 사이트 이용 가이드 md 파일 load
-md_file_path = r"chatbot\guieds\member_website_guied.md"
+current_dir = os.path.dirname(os.path.abspath(__file__))
+md_file_path = os.path.join(current_dir, "guides", "member_website_guide.md")
+
 loader = TextLoader(md_file_path, encoding='utf-8')
 docs = loader.load()
 
@@ -63,7 +67,7 @@ embeddings = HuggingFaceEmbeddings(
     model_name="sentence-transformers/all-MiniLM-L6-v2"
 )
 
-# 벡터 db 생성 (항상 최신 md 내용 기준으로 인메모리 생성)
+# 벡터 db 생성
 collection_name = "member_website_guide"
 vectorstore = Chroma.from_documents(
     documents=splits,
