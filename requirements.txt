@@ -51,7 +51,7 @@ hf-xet==1.2.0
 httpcore==1.0.9
 httptools==0.7.1
 httpx==0.28.1
-huggingface_hub==1.2.2
+huggingface_hub>=0.34.0,<1.0
 idna==3.11
 ifaddr==0.2.0
 ipykernel==7.1.0
@@ -161,6 +161,9 @@ terminado==0.18.1
 tinycss2==1.4.0
 tomlkit==0.13.3
 torch==2.9.1
+transformers>=4.53.1,<4.54
+bitsandbytes>=0.43.0
+accelerate>=0.30.0
 torchvision==0.24.1
 tornado==6.5.2
 tqdm==4.67.1
