@@ -117,9 +117,8 @@ def retrieve_with_keywords(question: str):
 
 
 llm = ChatGoogleGenerativeAI(
-    # model="models/gemini-flash-latest",
     model="models/gemini-flash-latest",
-    temperature=0.5
+    temperature=0.2
 )
 
 template = """당신은 '아이마음' 웹사이트의 **전문 이용 가이드 챗봇**입니다.
@@ -150,6 +149,7 @@ prompt = ChatPromptTemplate.from_template(template)
 # 벡터 db 생성 또는 로드
 collection_name="guied"
 persist_dir = "./chroma_db"
+
 
 if os.path.exists(persist_dir):
     print('이미 DB 존재함')
@@ -201,3 +201,5 @@ print('답변:', answer)
 # 질문: 그림 인식을 더 잘 시키려면 어떻게 해야 하나요?
 
 
+
+# 심리 분석 결과 챗봇
