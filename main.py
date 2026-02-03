@@ -1,5 +1,5 @@
 import os
-
+import markdown
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -44,6 +44,13 @@ def chatbot(payload: ChatbotRequest):
     if not question:
         raise HTTPException(status_code=400, detail="질문을 입력해 주세요.")
     answer = get_chatbot_answer(question)
+
+    if not answer:
+        raise HTTPException(status_code=500, detail="답변을 준비할 수 없습니다.")
+    
+    # answer는 markdown 형식이기 때문에 HTML로 바꿔서 반환합니다.
+    answer = markdown.markdown(answer, extensions=["nl2br"])
+    
     return ChatbotResponse(question=question, answer=answer)
 
 
