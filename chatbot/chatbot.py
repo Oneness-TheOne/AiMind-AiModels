@@ -9,6 +9,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableParallel, RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
+from langchain_community.document_loaders import TextLoader
 
 
 # textfile loader 무거운 버전(전처리 필요할 경우)
@@ -21,9 +22,12 @@ from langchain_community.document_loaders import TextLoader
 # 문자열로 경로 직접 지정 (r을 붙여야 역슬래시 인식이 잘 됩니다)
 load_dotenv(r"..\Back\.env")
 api_key = os.getenv("GOOGLE_API_KEY")
+print(f"로드된 API 키 존재 여부: {'예' if api_key else '아니오'}")
 
 # 사이트 이용 가이드 md 파일 load
-md_file_path = r"chatbot\guieds\member_website_guied.md"
+current_dir = os.path.dirname(os.path.abspath(__file__))
+md_file_path = os.path.join(current_dir, "guides", "member_website_guide.md")
+
 loader = TextLoader(md_file_path, encoding='utf-8')
 docs = loader.load()
 
@@ -63,7 +67,7 @@ embeddings = HuggingFaceEmbeddings(
     model_name="sentence-transformers/all-MiniLM-L6-v2"
 )
 
-# 벡터 db 생성 (항상 최신 md 내용 기준으로 인메모리 생성)
+# 벡터 db 생성
 collection_name = "member_website_guide"
 vectorstore = Chroma.from_documents(
     documents=splits,
@@ -113,9 +117,8 @@ def retrieve_with_keywords(question: str):
 
 
 llm = ChatGoogleGenerativeAI(
-    # model="models/gemini-flash-latest",
     model="models/gemini-flash-latest",
-    temperature=0.5
+    temperature=0.2
 )
 
 template = """당신은 '아이마음' 웹사이트의 **전문 이용 가이드 챗봇**입니다.
@@ -146,6 +149,7 @@ prompt = ChatPromptTemplate.from_template(template)
 # 벡터 db 생성 또는 로드
 collection_name="guied"
 persist_dir = "./chroma_db"
+
 
 if os.path.exists(persist_dir):
     # print('이미 DB 존재함')
@@ -197,3 +201,5 @@ print('답변:', answer)
 # 질문: 그림 인식을 더 잘 시키려면 어떻게 해야 하나요?
 
 
+
+# 심리 분석 결과 챗봇
