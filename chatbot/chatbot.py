@@ -148,7 +148,7 @@ collection_name="guied"
 persist_dir = "./chroma_db"
 
 if os.path.exists(persist_dir):
-    print('이미 DB 존재함')
+    # print('이미 DB 존재함')
     vectorstore = Chroma(
         persist_directory=persist_dir,
         embedding_function=embeddings,
