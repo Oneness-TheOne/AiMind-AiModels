@@ -1,4 +1,3 @@
-from google import genai
 import os
 import re
 from dotenv import load_dotenv
@@ -18,14 +17,14 @@ from langchain_community.document_loaders import TextLoader
 # textfile loader 가벼운 버전
 from langchain_community.document_loaders import TextLoader
 
-# Back 폴더의 .env 파일 로드
-# 문자열로 경로 직접 지정 (r을 붙여야 역슬래시 인식이 잘 됩니다)
-load_dotenv(r"..\Back\.env")
+# AiModels 폴더의 .env 파일 로드
+current_dir = os.path.dirname(os.path.abspath(__file__))
+env_path = os.path.join(current_dir, "..", ".env")
+load_dotenv(env_path)
 api_key = os.getenv("GOOGLE_API_KEY")
 print(f"로드된 API 키 존재 여부: {'예' if api_key else '아니오'}")
 
 # 사이트 이용 가이드 md 파일 load
-current_dir = os.path.dirname(os.path.abspath(__file__))
 md_file_path = os.path.join(current_dir, "guides", "member_website_guide.md")
 
 loader = TextLoader(md_file_path, encoding='utf-8')
@@ -181,22 +180,40 @@ rag_chain = (
     | StrOutputParser() 
 )
 
-question = input("웹 사이트 이용 방법에 대해 질문해 보세요!  ")
+def get_chatbot_answer(question: str) -> str:
+    return rag_chain.invoke(question)
 
-# 2. 키워드 기반 retriever를 통해 관련 문서 가져오기 (리스트 반환)
-search_results = retrieve_with_keywords(question)
 
-# 3. retriever 결과 확인
-print(f"\n🔍 '{question}'에 대해 찾은 문서 개수: {len(search_results)}개\n")
+def _print_search_results(question: str) -> None:
+    search_results = retrieve_with_keywords(question)
 
-for i, doc in enumerate(search_results):
-    print(f"--- [검색 결과 {i+1}] ---")
-    print(f"내용 요약: {doc.page_content[:200]}...")  # 너무 길면 앞부분만 출력
-    print(f"메타데이터: {doc.metadata}")
-    print("\n")
+    print(f"\n🔍 '{question}'에 대해 찾은 문서 개수: {len(search_results)}개\n")
 
-answer = rag_chain.invoke(question)
-print('답변:', answer)
+    for i, doc in enumerate(search_results):
+        print(f"--- [검색 결과 {i+1}] ---")
+        print(f"내용 요약: {doc.page_content[:200]}...")  # 너무 길면 앞부분만 출력
+        print(f"메타데이터: {doc.metadata}")
+        print("\n")
+
+
+if __name__ == "__main__":
+    print("웹 사이트 이용 방법에 대해 질문해 보세요! (종료: 'exit' 또는 'quit' 또는 '종료')")
+
+    while True:
+        question = input("질문: ").strip()
+
+        if not question:
+            print("질문을 입력해 주세요. (종료: 'exit' 또는 'quit' 또는 '종료')")
+            continue
+
+        if question.lower() in {"exit", "quit"} or question == "종료":
+            print("대화를 종료합니다.")
+            break
+
+        _print_search_results(question)
+
+        answer = get_chatbot_answer(question)
+        print('답변:', answer)
 
 # 질문: 그림 인식을 더 잘 시키려면 어떻게 해야 하나요?
 
