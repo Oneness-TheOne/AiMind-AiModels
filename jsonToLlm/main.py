@@ -62,6 +62,14 @@ def cmd_interpret(args: argparse.Namespace) -> None:
     with open(args.input, "r", encoding="utf-8") as f:
         original = json.load(f)
 
+    # 새 형식(features + image_size)이면 기존 형식(meta + annotations.bbox)으로 변환
+    try:
+        from legacy_converter import is_new_format, convert_new_to_legacy
+        if is_new_format(original):
+            original = convert_new_to_legacy(original, args.input)
+    except ImportError:
+        pass
+
     api_key = getattr(args, "api_key", None) or os.getenv("GEMINI_API_KEY")
     if not api_key:
         print("✗ GEMINI_API_KEY가 필요합니다. (환경변수 또는 --api-key)")
