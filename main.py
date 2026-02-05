@@ -31,15 +31,22 @@ IMAGE_UPLOAD_DIR = IMAGE_TO_JSON_DIR / "uploads"
 IMAGE_RESULT_DIR = IMAGE_TO_JSON_DIR / "result"
 JSON_TO_LLM_DIR = BASE_DIR / "jsonToLlm"
 JSON_TO_LLM_RESULTS_DIR = JSON_TO_LLM_DIR / "results"
+OCR_DIR = BASE_DIR / "ocr"
+OCR_UPLOAD_DIR = OCR_DIR / "uploads"
+OCR_RESULT_DIR = OCR_DIR / "results"
 
 IMAGE_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 IMAGE_RESULT_DIR.mkdir(parents=True, exist_ok=True)
 JSON_TO_LLM_RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+OCR_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+OCR_RESULT_DIR.mkdir(parents=True, exist_ok=True)
 
 if str(IMAGE_TO_JSON_DIR) not in sys.path:
     sys.path.append(str(IMAGE_TO_JSON_DIR))
 if str(JSON_TO_LLM_DIR) not in sys.path:
     sys.path.append(str(JSON_TO_LLM_DIR))
+if str(OCR_DIR) not in sys.path:
+    sys.path.append(str(OCR_DIR))
 
 app.add_middleware(
     CORSMiddleware,
@@ -99,6 +106,65 @@ def _normalize_gender(value: str) -> str:
     if v in {"female", "f", "여", "여아"}:
         return "여"
     return "미상"
+
+
+def _run_diary_ocr(file_path: str, area: str) -> dict:
+    import diary_ocr_pipeline as diary_ocr
+
+    if diary_ocr.model is None or diary_ocr.processor is None:
+        diary_ocr.load_model()
+
+    result = diary_ocr.preprocess_diary_image(
+        file_path,
+        show_result=False,
+        return_detection_vis=False,
+    )
+
+    if len(result) == 5:
+        left_pil, right_pil, _, _, _ = result
+        raw_left, text_boxes_left, full_text_left, pil_left_sent = diary_ocr.run_varco_ocr(
+            left_pil, max_long_side=512, diary_mode=True
+        )
+        raw_right, text_boxes_right, full_text_right, pil_right_sent = diary_ocr.run_varco_ocr(
+            right_pil, max_long_side=512, diary_mode=True
+        )
+        full_text = full_text_left + full_text_right
+        raw_output = (raw_left or "") + "\n" + (raw_right or "")
+        text_boxes = text_boxes_left.copy()
+        w_left = pil_left_sent.size[0]
+        w_right = pil_right_sent.size[0]
+        w_comb = w_left + w_right
+        for item in text_boxes_right:
+            b = item.get("bbox")
+            if b and len(b) >= 4 and max(b) <= 1.0:
+                x1, y1, x2, y2 = b[0], b[1], b[2], b[3]
+                x1_new = (x1 * w_right + w_left) / w_comb
+                x2_new = (x2 * w_right + w_left) / w_comb
+                text_boxes.append({"text": item["text"], "bbox": [x1_new, y1, x2_new, y2]})
+            else:
+                text_boxes.append(item)
+    elif len(result) == 3:
+        pil_image, _, _ = result
+        raw_output, text_boxes, full_text, _ = diary_ocr.run_varco_ocr(
+            pil_image, max_long_side=512, diary_mode=True
+        )
+    else:
+        pil_image, _ = result
+        raw_output, text_boxes, full_text, _ = diary_ocr.run_varco_ocr(
+            pil_image, max_long_side=512, diary_mode=True
+        )
+
+    min_bbox_area = 0.0003
+    text_boxes = [
+        item for item in text_boxes
+        if item.get("bbox") and len(item["bbox"]) >= 4
+        and (item["bbox"][2] - item["bbox"][0]) * (item["bbox"][3] - item["bbox"][1]) >= min_bbox_area
+    ]
+    full_text = "".join(item["text"] for item in text_boxes)
+    display_text = diary_ocr.get_diary_text(raw_output, full_text)
+    diary_result = diary_ocr.process_diary_text(display_text, area=area)
+    diary_ocr.clean_memory()
+    return diary_result
 
 
 @app.post("/analyze")
@@ -208,6 +274,35 @@ async def analyze(
         },
         "results": results,
     }
+
+
+@app.post("/diary-ocr")
+async def diary_ocr(file: UploadFile = File(...), area: str = Form("도봉구")):
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="파일을 업로드해 주세요.")
+
+    ext = Path(file.filename).suffix or ".jpg"
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    input_path = OCR_UPLOAD_DIR / f"diary_{timestamp}{ext}"
+    _save_upload_file(file, input_path)
+
+    try:
+        diary_result = _run_diary_ocr(str(input_path), area=area)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"일기 OCR 실패: {e}")
+
+    if "오류" in diary_result:
+        raise HTTPException(status_code=500, detail=f"일기 분석 실패: {diary_result['오류']}")
+
+    response_item = {
+        "원본": diary_result.get("원본", ""),
+        "날짜": diary_result.get("날짜", ""),
+        "지역": area,
+        "날씨": diary_result.get("날씨", ""),
+        "제목": diary_result.get("제목", ""),
+        "교정된_내용": diary_result.get("내용", ""),
+    }
+    return [response_item]
 
 
 if __name__ == "__main__":
