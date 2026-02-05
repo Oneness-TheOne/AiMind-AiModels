@@ -21,7 +21,7 @@ from langchain_community.document_loaders import TextLoader
 current_dir = os.path.dirname(os.path.abspath(__file__))
 env_path = os.path.join(current_dir, "..", ".env")
 load_dotenv(env_path)
-api_key = os.getenv("GOOGLE_API_KEY")
+api_key = os.getenv("GEMINI_API_KEY", os.getenv("GOOGLE_API_KEY"))
 print(f"로드된 API 키 존재 여부: {'예' if api_key else '아니오'}")
 
 # 사이트 이용 가이드 md 파일 load
