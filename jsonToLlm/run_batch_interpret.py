@@ -18,13 +18,14 @@ import time
 
 # jsonToLlm 기준 실행 가정
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+IMAGE_JSON_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "image_to_json", "result"))
 os.chdir(SCRIPT_DIR)
 
 DEFAULT_INPUTS = [
-    "나무_7_남_00367.json",
-    "남자사람_7_남_00978.json",
-    "여자사람_7_남_01606.json",
-    "집_7_남_00885.json",
+    os.path.join(IMAGE_JSON_DIR, "나무_7_남_00367.json"),
+    os.path.join(IMAGE_JSON_DIR, "남자사람_7_남_00978.json"),
+    os.path.join(IMAGE_JSON_DIR, "여자사람_7_남_01606.json"),
+    os.path.join(IMAGE_JSON_DIR, "집_7_남_00885.json"),
 ]
 
 

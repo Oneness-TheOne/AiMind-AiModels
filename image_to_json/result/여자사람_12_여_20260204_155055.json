@@ -1,0 +1,175 @@
+{
+  "image_path": "C:\\Honey\\Projects\\mid-term\\AiMind-AiModels\\image_to_json\\uploads\\여자사람_12_여_20260204_155055.png",
+  "image_size": {
+    "width": 768,
+    "height": 1024
+  },
+  "object_type": "woman",
+  "object_type_kr": "여자사람",
+  "model_weights": "C:\\Honey\\Projects\\mid-term\\AiMind-AiModels\\image_to_json\\woman_weights\\best.pt",
+  "classes_kr": [
+    "사람전체",
+    "머리",
+    "얼굴",
+    "눈",
+    "코",
+    "입",
+    "귀",
+    "머리카락",
+    "목",
+    "상체",
+    "팔",
+    "손",
+    "다리",
+    "발",
+    "단추",
+    "주머니",
+    "운동화",
+    "여자구두"
+  ],
+  "features": {
+    "단추": {
+      "has": 1,
+      "ratio": 0.002197,
+      "center_x": 0.392578,
+      "center_y": 0.39209,
+      "confidence": 0.8473
+    },
+    "상체": {
+      "has": 1,
+      "ratio": 0.010564,
+      "center_x": 0.389418,
+      "center_y": 0.394628,
+      "confidence": 0.8132
+    },
+    "목": {
+      "has": 1,
+      "ratio": 0.000712,
+      "center_x": 0.395182,
+      "center_y": 0.339355,
+      "confidence": 0.7998
+    },
+    "눈": {
+      "has": 1,
+      "ratio": 0.017928,
+      "center_x": 0.490994,
+      "center_y": 0.130786,
+      "confidence": 0.7775
+    },
+    "손": {
+      "has": 1,
+      "ratio": 0.00592,
+      "center_x": 0.337891,
+      "center_y": 0.390016,
+      "confidence": 0.7005
+    },
+    "운동화": {
+      "has": 1,
+      "ratio": 0.028067,
+      "center_x": 0.550292,
+      "center_y": 0.351558,
+      "confidence": 0.5443
+    },
+    "팔": {
+      "has": 1,
+      "ratio": 0.014584,
+      "center_x": 0.468054,
+      "center_y": 0.391166,
+      "confidence": 0.4814
+    },
+    "머리": {
+      "has": 1,
+      "ratio": 0.045724,
+      "center_x": 0.404961,
+      "center_y": 0.084108,
+      "confidence": 0.4561
+    },
+    "입": {
+      "has": 1,
+      "ratio": 0.000305,
+      "center_x": 0.389974,
+      "center_y": 0.32373,
+      "confidence": 0.4457
+    },
+    "사람전체": {
+      "has": 1,
+      "ratio": 0.094081,
+      "center_x": 0.399845,
+      "center_y": 0.524041,
+      "confidence": 0.4279
+    },
+    "주머니": {
+      "has": 1,
+      "ratio": 0.001831,
+      "center_x": 0.729818,
+      "center_y": 0.114746,
+      "confidence": 0.2739
+    },
+    "머리카락": {
+      "has": 1,
+      "ratio": 0.026591,
+      "center_x": 0.356174,
+      "center_y": 0.296458,
+      "confidence": 0.2422
+    },
+    "얼굴": {
+      "has": 1,
+      "ratio": 0.008129,
+      "center_x": 0.396072,
+      "center_y": 0.283067,
+      "confidence": 0.1747
+    },
+    "코": {
+      "has": 0,
+      "ratio": 0.0,
+      "center_x": -1,
+      "center_y": -1,
+      "confidence": 0
+    },
+    "귀": {
+      "has": 0,
+      "ratio": 0.0,
+      "center_x": -1,
+      "center_y": -1,
+      "confidence": 0
+    },
+    "다리": {
+      "has": 0,
+      "ratio": 0.0,
+      "center_x": -1,
+      "center_y": -1,
+      "confidence": 0
+    },
+    "발": {
+      "has": 0,
+      "ratio": 0.0,
+      "center_x": -1,
+      "center_y": -1,
+      "confidence": 0
+    },
+    "여자구두": {
+      "has": 0,
+      "ratio": 0.0,
+      "center_x": -1,
+      "center_y": -1,
+      "confidence": 0
+    }
+  },
+  "detected_classes_kr": [
+    "단추",
+    "상체",
+    "목",
+    "눈",
+    "손",
+    "운동화",
+    "팔",
+    "머리",
+    "입",
+    "사람전체",
+    "주머니",
+    "머리카락",
+    "얼굴"
+  ],
+  "detection_count": 13,
+  "summary": "여자사람 이미지에서 단추, 상체, 목, 눈, 손, 운동화, 팔, 머리, 입, 사람전체, 주머니, 머리카락, 얼굴가 감지되었습니다. 단추가 이미지의 약 0.2%를 차지합니다."
+}

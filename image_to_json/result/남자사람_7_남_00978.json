@@ -1,0 +1,180 @@
+{
+  "image_path": "c:\\Honey\\Projects\\mid-term\\AiMind-AiModels\\image_to_json\\test\\남자사람_7_남_00978.jpg",
+  "image_size": {
+    "width": 1280,
+    "height": 1280
+  },
+  "object_type": "man",
+  "object_type_kr": "남자사람",
+  "model_weights": "C:\\Honey\\Projects\\mid-term\\AiMind-AiModels\\image_to_json\\man_weights\\best.pt",
+  "classes_kr": [
+    "사람전체",
+    "머리",
+    "얼굴",
+    "눈",
+    "코",
+    "입",
+    "귀",
+    "머리카락",
+    "목",
+    "상체",
+    "팔",
+    "손",
+    "다리",
+    "발",
+    "단추",
+    "주머니",
+    "운동화",
+    "남자구두"
+  ],
+  "features": {
+    "상체": {
+      "has": 1,
+      "ratio": 0.003683,
+      "center_x": 0.156535,
+      "center_y": 0.266564,
+      "confidence": 0.989
+    },
+    "얼굴": {
+      "has": 1,
+      "ratio": 0.004335,
+      "center_x": 0.158671,
+      "center_y": 0.204731,
+      "confidence": 0.9849
+    },
+    "사람전체": {
+      "has": 1,
+      "ratio": 0.012551,
+      "center_x": 0.159455,
+      "center_y": 0.306247,
+      "confidence": 0.9808
+    },
+    "머리": {
+      "has": 1,
+      "ratio": 0.00071,
+      "center_x": 0.151459,
+      "center_y": 0.160128,
+      "confidence": 0.9761
+    },
+    "발": {
+      "has": 1,
+      "ratio": 0.001326,
+      "center_x": 0.154339,
+      "center_y": 0.383179,
+      "confidence": 0.9655
+    },
+    "주머니": {
+      "has": 1,
+      "ratio": 0.000341,
+      "center_x": 0.15632,
+      "center_y": 0.306377,
+      "confidence": 0.964
+    },
+    "팔": {
+      "has": 1,
+      "ratio": 0.004357,
+      "center_x": 0.151626,
+      "center_y": 0.269632,
+      "confidence": 0.9521
+    },
+    "입": {
+      "has": 1,
+      "ratio": 0.000471,
+      "center_x": 0.160047,
+      "center_y": 0.215032,
+      "confidence": 0.9275
+    },
+    "머리카락": {
+      "has": 1,
+      "ratio": 0.002736,
+      "center_x": 0.159602,
+      "center_y": 0.16646,
+      "confidence": 0.925
+    },
+    "손": {
+      "has": 1,
+      "ratio": 0.000961,
+      "center_x": 0.140972,
+      "center_y": 0.299338,
+      "confidence": 0.9183
+    },
+    "단추": {
+      "has": 1,
+      "ratio": 0.000469,
+      "center_x": 0.157422,
+      "center_y": 0.273047,
+      "confidence": 0.9172
+    },
+    "남자구두": {
+      "has": 1,
+      "ratio": 0.006556,
+      "center_x": 0.324927,
+      "center_y": 0.226896,
+      "confidence": 0.9068
+    },
+    "다리": {
+      "has": 1,
+      "ratio": 0.002083,
+      "center_x": 0.153632,
+      "center_y": 0.354585,
+      "confidence": 0.8938
+    },
+    "운동화": {
+      "has": 1,
+      "ratio": 0.006109,
+      "center_x": 0.324395,
+      "center_y": 0.219339,
+      "confidence": 0.8417
+    },
+    "귀": {
+      "has": 1,
+      "ratio": 0.000428,
+      "center_x": 0.164499,
+      "center_y": 0.183087,
+      "confidence": 0.841
+    },
+    "목": {
+      "has": 1,
+      "ratio": 0.000369,
+      "center_x": 0.158635,
+      "center_y": 0.234832,
+      "confidence": 0.8011
+    },
+    "코": {
+      "has": 1,
+      "ratio": 0.000146,
+      "center_x": 0.158984,
+      "center_y": 0.202734,
+      "confidence": 0.7968
+    },
+    "눈": {
+      "has": 1,
+      "ratio": 0.000187,
+      "center_x": 0.160399,
+      "center_y": 0.190926,
+      "confidence": 0.6334
+    }
+  },
+  "detected_classes_kr": [
+    "상체",
+    "얼굴",
+    "사람전체",
+    "머리",
+    "발",
+    "주머니",
+    "팔",
+    "입",
+    "머리카락",
+    "손",
+    "단추",
+    "남자구두",
+    "다리",
+    "운동화",
+    "귀",
+    "목",
+    "코",
+    "눈"
+  ],
+  "detection_count": 18,
+  "summary": "남자사람 이미지에서 상체, 얼굴, 사람전체, 머리, 발, 주머니, 팔, 입, 머리카락, 손, 단추, 남자구두, 다리, 운동화, 귀, 목, 코, 눈가 감지되었습니다. 상체가 이미지의 약 0.4%를 차지합니다."
+}
