@@ -1,0 +1,144 @@
+{
+  "image_path": "C:\\Honey\\Projects\\mid-term\\AiMind-AiModels\\image_to_json\\uploads\\나무_8_남_20260205_141347.jpg",
+  "image_size": {
+    "width": 1024,
+    "height": 1024
+  },
+  "object_type": "tree",
+  "object_type_kr": "나무",
+  "model_weights": "C:\\Honey\\Projects\\mid-term\\AiMind-AiModels\\image_to_json\\tree_weights\\best.pt",
+  "classes_kr": [
+    "나무전체",
+    "기둥",
+    "수관",
+    "가지",
+    "뿌리",
+    "나뭇잎",
+    "꽃",
+    "열매",
+    "그네",
+    "새",
+    "다람쥐",
+    "구름",
+    "달",
+    "별"
+  ],
+  "features": {
+    "수관": {
+      "has": 1,
+      "ratio": 0.049261,
+      "center_x": 0.275383,
+      "center_y": 0.276098,
+      "confidence": 0.9919
+    },
+    "구름": {
+      "has": 1,
+      "ratio": 0.03809,
+      "center_x": 0.190384,
+      "center_y": 0.073427,
+      "confidence": 0.9881
+    },
+    "열매": {
+      "has": 1,
+      "ratio": 0.00293,
+      "center_x": 0.181152,
+      "center_y": 0.208496,
+      "confidence": 0.9833
+    },
+    "다람쥐": {
+      "has": 1,
+      "ratio": 0.017258,
+      "center_x": 0.491699,
+      "center_y": 0.60498,
+      "confidence": 0.9699
+    },
+    "꽃": {
+      "has": 1,
+      "ratio": 0.006744,
+      "center_x": 0.120605,
+      "center_y": 0.634277,
+      "confidence": 0.967
+    },
+    "나무전체": {
+      "has": 1,
+      "ratio": 0.038594,
+      "center_x": 0.256705,
+      "center_y": 0.523482,
+      "confidence": 0.9645
+    },
+    "별": {
+      "has": 1,
+      "ratio": 0.033178,
+      "center_x": 0.563552,
+      "center_y": 0.089038,
+      "confidence": 0.9644
+    },
+    "그네": {
+      "has": 1,
+      "ratio": 0.083832,
+      "center_x": 0.593262,
+      "center_y": 0.356934,
+      "confidence": 0.9562
+    },
+    "달": {
+      "has": 1,
+      "ratio": 0.008972,
+      "center_x": 0.358887,
+      "center_y": 0.071777,
+      "confidence": 0.9544
+    },
+    "뿌리": {
+      "has": 1,
+      "ratio": 0.025177,
+      "center_x": 0.280762,
+      "center_y": 0.630371,
+      "confidence": 0.9536
+    },
+    "나뭇잎": {
+      "has": 1,
+      "ratio": 0.002747,
+      "center_x": 0.321777,
+      "center_y": 0.206543,
+      "confidence": 0.9368
+    },
+    "기둥": {
+      "has": 1,
+      "ratio": 0.037655,
+      "center_x": 0.288986,
+      "center_y": 0.453191,
+      "confidence": 0.9094
+    },
+    "가지": {
+      "has": 1,
+      "ratio": 0.023171,
+      "center_x": 0.273755,
+      "center_y": 0.285163,
+      "confidence": 0.8598
+    },
+    "새": {
+      "has": 1,
+      "ratio": 0.014832,
+      "center_x": 0.087402,
+      "center_y": 0.194824,
+      "confidence": 0.8115
+    }
+  },
+  "detected_classes_kr": [
+    "수관",
+    "구름",
+    "열매",
+    "다람쥐",
+    "꽃",
+    "나무전체",
+    "별",
+    "그네",
+    "달",
+    "뿌리",
+    "나뭇잎",
+    "기둥",
+    "가지",
+    "새"
+  ],
+  "detection_count": 14,
+  "summary": "나무 이미지에서 수관, 구름, 열매, 다람쥐, 꽃, 나무전체, 별, 그네, 달, 뿌리, 나뭇잎, 기둥, 가지, 새가 감지되었습니다. 수관가 이미지의 약 4.9%를 차지합니다. 기둥는 왼쪽에 위치합니다. 수관는 왼쪽에 위치합니다. 달는 왼쪽에 위치합니다. 별는 가운데에 위치합니다. 구름는 왼쪽에 위치합니다."
+}

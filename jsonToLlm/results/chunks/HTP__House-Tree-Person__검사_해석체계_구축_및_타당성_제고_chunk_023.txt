@@ -1,0 +1,212 @@
+[--- 표 데이터 시작 ---]
+| 내 용 |  | 매우 그렇 다 | 그렇 다 | 보통 이다 | 아니 다 | 전혀 아니 다 |
+|  |  |  |  |  |  |  |
+| 6. | 나는 친구들이 내 말에 따라주지 않으면 욕을 한다. |  |  |  |  |  |
+| 7. | 친구들은 이유 없이 나를 괴롭힌다. |  |  |  |  |  |
+| 8. | 친구들에게 이용당한다고 생각될 때가 자주 있다. |  |  |  |  |  |
+| 9. | 나는 친구들로부터 오해받을 때가 자주 있다. |  |  |  |  |  |
+| 10. | 나는 누가 잘난 체 하면 참을 수 없을 만큼 짜증이 난다. |  |  |  |  |  |
+|  |  |  |  |  |  |  |
+|  |  |  |  |  |  |  |
+| 16. | 나는 다른 사람들이 바라는 것이나 욕구를 잘 알아챈다. |  |  |  |  |  |
+| 17. | 나는 나 자신의 감정을 잘 이해한다. |  |  |  |  |  |
+| 18. | 나는 다른 사람의 감정 상태에 민감하다. |  |  |  |  |  |
+| 19. | 나의 생각이나 행동은 다른 사람에게 개방적이다. |  |  |  |  |  |
+| 20. | 나는 다른 사람의 느낌을 잘 이해한다. |  |  |  |  |  |
+|  |  |  |  |  |  |  |
+| 26. | 다른 사람이 나에 대한 부정적인 느낌을 표현 할 때, 나는 그것을 긍정적 으로 믿고 받아들인다. |  |  |  |  |  |
+| 27. | 다른 사람들이 나를 싫어하고 있다고 걱정한다. |  |  |  |  |  |
+| 28. | 나는 잘 아는 사람들과 있어도 수줍음을 탄다. |  |  |  |  |  |
+| 29. | 다른 사람 앞에서 내가 해보지 않았던 새로운 일을 해야 할 때 걱정이 된 다. |  |  |  |  |  |
+| 30. | 친구들이 나 몰래 내 얘기를 할 거라고 생각한다. |  |  |  |  |  |
+
+[--- 표 데이터 끝 ---]
+
+
+--- Page 220 ---
+매우 보통 전혀
+내 용 그렇다 아니다
+그렇다 이다 아니다
+36.다른 사람에게 무엇을 같이 하자고 부탁하지 못한다.
+37.나는 적어도 내가 다른 사람들만큼 가치 있는 사람이라고 느낀다.
+38.나는 내가 장점이 많다고 생각한다.
+39.대체로 나는 내가 실패자라고 생각하는 경향이 있다.
+40.나는 남들이 하는 만큼은 일을 할 수 있다.
+41.나는 나에게 자랑할 만한 것들이 별로 없다고 느낀다.
+42.나는 내 자신에 대해 긍정적인 태도를 갖고 있다.
+43.대체로 나는 내 자신에 대해 만족한다.
+44.나는 내 자신을 좀 더 존중할 수 있으면 하고 느낀다.
+45.나는 때때로 내 자신이 쓸모없는 존재라고 느껴진다.
+46.때때로 나는 내가 전혀 유능하지 않다고 생각한다.
+2) 지시문 : 아래에 있는 항목들이 최근 일주일 동안에 귀하에게 얼마나 자주 일어
+났었는지, 일치하는 곳에 ‘V’표를 해 주시기를 바랍니다.
+1 : 극히 드물다 2 : 가끔 있었다 3 : 종종 있었다 4 : 자주 있었다 5 : 대부분 그랬다
+(일주일 1일 이하) (일주일 1~2일) (일주일 3~4일간) (일주일 4~5일간) (일주일 5일 이상)
+내 용 1 2 3 4 5
+1. 나는 자주 슬프다
+2. 나는 일이 제대로 되어 갈지 확신할 수 없다.
+3. 나는 어떤 일도 전혀 재미가 없다.
+4. 나는 잠을 잘 잔다.
+5. 나는 나 자신을 좋아하지 않는다.
+6. 나는 울고 싶은 기분인 날도 많다.
+7. 나는 어떤 일에 대한 결정을 내리기가 어렵다.
+8. 나는 괜찮게 생겼다.
+9. 나는 밥맛이 없을 때가 많다.
+10. 나의 학교 성적은 예전처럼 좋지는 않다.
+11. 나는 누가 나에게 시킨 일은 절대로 하지 않는다.
+12. 나는 사람들과 잘 싸운다.
+- 205 -
+
+[--- 표 데이터 시작 ---]
+| 내 용 |  | 매우 그렇다 | 그렇다 | 보통 이다 | 아니다 | 전혀 아니다 |
+| 36. | 다른 사람에게 무엇을 같이 하자고 부탁하지 못한다. |  |  |  |  |  |
+| 37. | 나는 적어도 내가 다른 사람들만큼 가치 있는 사람이라고 느낀다. |  |  |  |  |  |
+| 38. | 나는 내가 장점이 많다고 생각한다. |  |  |  |  |  |
+| 39. | 대체로 나는 내가 실패자라고 생각하는 경향이 있다. |  |  |  |  |  |
+| 40. | 나는 남들이 하는 만큼은 일을 할 수 있다. |  |  |  |  |  |
+
+| 내 용 | 1 | 2 | 3 | 4 | 5 |
+|  |  |  |  |  |  |
+
+[--- 표 데이터 끝 ---]
+
+
+--- Page 221 ---
+2. 검사 항목
+항목 문항 참 고 문 헌
+이은아 (2011). 초등학생용 공격성 척도 개발
+공격성 1번~12번
+및 타당화. 경성대 박사논문.
+전석균 (1995). 정신분열증 환자의 재활을 위
+대인관계 13번~26번 한 사회기술 훈련 프로그램의 효과성에 관한
+연구. 숭실대학교 대학원 박사학위논문.
+양윤란(2004). 또래관계기술이 사회불안에 영
+향을 미치는 기제: 자기제시 기대와 자기통찰
+사회불안 27번~36번
+의 매개 중재 효과. 연세대학교 대학원 박사학
+위논문.
+어주경(1998) 저소득층 가족의 경제적 어려움
+자아존중감 37번~46번 이 아동의 자존감에 미치는 영향. 연세대학교
+대학원 박사학위논문.
+조수철, 이영식 (1990). 한국형 소아우울 척도
+우울 1번~12번
+의 개발. 신경정신의학, 29(4). 943-956.
+• 공격성 척도
+이 척도는 초등학교 4, 5, 6학년 아동을 대상으로 개발된 것으로 행동적 공격
+성, 적대감, 분노감 등을 측정하는 12문항으로 구성되어 있다.
+행동적 공격성 : 1, 2, 3, 4, 5, 6 / 적대감 : 7, 8, 9 / 분노감 : 10, 11, 12
+• 대인관계 척도
+이 척도는 만족감, 의사소통, 신뢰감, 친근감, 민감성, 개방성, 이해성 등을 측
+정하는 14문항으로 구성되어 있다.
+만족감 : 13, 14 / 의사소통 : 21, 26 / 신뢰감 : 22, 24 / 친근감 : 15, 23
+민감성 : 16, 18 / 개방성 : 19, 25 / 이해성 : 17, 20
+- 206 -
+--- Page 222 ---
+• 사회불안 척도
+이 척도는 부정적 평가에 대한 두려움, 새로운 상황에 대한 회피와 불안, 일반
+적 상활에 대한 회피와 불안 등을 측정하는 10문항으로 구성되어 있다.
+부정적 평가에 대한 두려움 : 27, 32, 35, 36
+새로운 상황에 대한 회피와 불안 : 29, 30, 34
+일반적 상황에 대한 회피와 불안 : 28, 31, 33
+• 자아존중감 척도
+이 척도는 긍정적 자아존중감, 부정적 자아존중감으로 구성된 자기보고식 척도
+로 10문항으로 구성되어 있다.
+• 우울 척도
+이 척도는 긍정적 감정과 우울 증상을 알아보는 척도로 12문항으로 구성되어
+있다.
+질 문 내 용
+1. 본인의 성별은 무엇입니까? ① 남 ② 여
+2. 본인의 나이는 몇 세입니까? 만 ( ) 세
+3. 본인의 학업성적은 어떻습니까? ① 상위권 ② 중상위권 ③ 중하위권 ④ 하위권
+4. 본인의 학교생활 만족도는 어떻습니까?
+① 매우 만족 ② 대체로 만족 ③ 보통 ④ 대체로 불만족 ⑤ 매우 불만족
+5. 본인의 종교는? ① 기독교 ② 천주교 ③ 불교 ④ 기타( ) ⑤ 없다
+※ 수고 많으셨습니다. 성실히 응답해 주셔서 감사드립니다.
+- 207 -
+--- Page 223 ---
+ABSTRACT
+Establishing Interpretation System and Improving
+Validity of HTP (House-Tree-Person) Test
+Baek, Won Dae
+Major in Military Counseling
+Department of Counseling Psychology
+Graduate School of Sahmyook University
+This study is to observe the relationship between the response
+characteristics of elementary school students by the level of personality
+attributes and to confirm the usefulness of HTP (House-Tree-Person) test as
+a projective testing tool that can distinguish psychological statements of
+elementary school students through HTP test. Because various projective
+tests basically used in the clinical site doesn't be standardized specifically, the
+criteria for judgment and interpretation have a big gap depending on a
+counselor's ability. To decline this gap, we need to escalate the filial of
+projective test how we make systemic checking-program Purpose of this
+study is to make the HTP test can be used usefully in counseling site by
+- 208 -
+--- Page 224 ---
+establishing the interpretation system of HTP test that its usefulness gets
+recognition not enough and verifying its validity. Especially, I will check
+usefulness as a diagnostic testing tool that can distinguish the general
+development of element school students, relationships between the response
+characteristics by the level of personality attributes, and psychological
+statements. And I will increase the utilization of the HTP test as a testing
+tool for kids.
+On study 1, the representations usually represented in clinical site were
+sorted and rechecked how were compared with representations of a prior
+study to verify existing the interpretative system and define new
+representative system. And this study is aimed as a tool that identifies the
+usefulness of the diagnostic inspection tool based on the image that can
+distinguish general development, relationship of response characteristics by the
+level of personality attributes, and psychological state, and diagnoses children,
+especially elementary school kids.
+On study 2, The subjects of this study were 343 people(boy: 173, girl: 170)
+who are in 4th, 5th, 6th grade in Seoul and they tested self-reporting test
+and HTP test. Collected data were verified by SPSS 23.0 through independent
+sample t-testing, ANOVA, and analysis of optimal correlation of Pearson. The
+main results of this research are as follows.
+First, boys get higher figure than girls' in the tests on aggression, and
+- 209 -
+--- Page 225 ---
+self-respect, but girls get higher figure than boys' in the tests on social
+unrest and depression. Sex doesn't make a considerable difference in test on
+interpersonal relationship.
+Second, 6th grade has more anger, a sub-measuring measure of aggression,
+than 5th grade, and 4th grade has no difference with above two grades. In
+an interpersonal relationship, 5th and 6th grade gets higher considerable
+figure than 4th-grade's. Also 6th grade gets considerably high figure than
+4th-grade's, and 5th grade doesn't show difference. We can see that personal
+characters are expressed conspicuously when the grade goes up.
+Third, we can notice that there are characteristic differences in the HTP
+test when it is compared with the results of the self-reporting questionnaire
+test. In house-image test, aggression represents considerable correlations with
+aggression, depression, interpersonal avoidance, emotional anxiety, complex,
+and regression. In tree-image test, aggression represents considerable
+correlations with each pictorial representations that represents aggression,
+anxiety, depression, interpersonal avoidance, self-respect atrophy, emotional
+anxiety, love deficiency, complex, and regression. And in person-image test,
+aggression represents considerable correlations with each pictorial
+representations that represents anxiety, and depression.
+Forth, as a of studying the correlation of pictorial representations of HTP
+test of five types interpreted almost samely with questionnaire test,
+- 210 -
+--- Page 226 ---
+aggression has high correlations with each representation of aggression in the
+house-image test, and tree-image test. The interpersonal relationship has
+ineligible correlations with each pictorial representation of interpersonal
+avoidance in the tree-image test. And social unrest has high correlations with
+each anxiety representations in the tree-image test, and person-image test.
+Self-respect represents ineligible correlations with each self-respect atrophies
+in house-image test, and person-image test.
+Fifth, as a result of analyzing images of the highest 10 people who
+represent psychological problems in self-reporting questionnaire test,
+considerable high correlation showed that the half of them are in 2
+representations, and the others are in 1 representation with self-reporting test
+We can take the results of characteristic differences that depend on sex
+and grade from the result of this study, and check the validity of the HTP
+test from considerable correlations of the HTP test. I agree that the subject
+of this study were normal elementary school students ─ 4th, 5th, and 6th
+grade ─ so there is a limit, also that the pictorial representations of
+maladjustment children are realistically clear. I discussed and suggested the
+need for follow-up studies that can make HTP test tool that can be
+organized and became common by studying subjects of various states such
+as children, teenagers, and adults.
+- 211 -
