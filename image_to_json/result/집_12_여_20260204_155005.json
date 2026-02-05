@@ -1,0 +1,148 @@
+{
+  "image_path": "C:\\Honey\\Projects\\mid-term\\AiMind-AiModels\\image_to_json\\uploads\\집_12_여_20260204_155005.png",
+  "image_size": {
+    "width": 768,
+    "height": 1024
+  },
+  "object_type": "house",
+  "object_type_kr": "집",
+  "model_weights": "C:\\Honey\\Projects\\mid-term\\AiMind-AiModels\\image_to_json\\house_weights\\weights\\best.pt",
+  "classes_kr": [
+    "집전체",
+    "지붕",
+    "집벽",
+    "문",
+    "창문",
+    "굴뚝",
+    "연기",
+    "울타리",
+    "길",
+    "연못",
+    "산",
+    "나무",
+    "꽃",
+    "잔디",
+    "태양"
+  ],
+  "features": {
+    "꽃": {
+      "has": 1,
+      "ratio": 0.031204,
+      "center_x": 0.370651,
+      "center_y": 0.396505,
+      "confidence": 0.9859
+    },
+    "창문": {
+      "has": 1,
+      "ratio": 0.013835,
+      "center_x": 0.47369,
+      "center_y": 0.369571,
+      "confidence": 0.969
+    },
+    "문": {
+      "has": 1,
+      "ratio": 0.014964,
+      "center_x": 0.585967,
+      "center_y": 0.406171,
+      "confidence": 0.9616
+    },
+    "울타리": {
+      "has": 1,
+      "ratio": 0.032725,
+      "center_x": 0.238745,
+      "center_y": 0.405712,
+      "confidence": 0.8953
+    },
+    "잔디": {
+      "has": 1,
+      "ratio": 0.333813,
+      "center_x": 0.375335,
+      "center_y": 0.401719,
+      "confidence": 0.7613
+    },
+    "길": {
+      "has": 1,
+      "ratio": 0.271408,
+      "center_x": 0.347326,
+      "center_y": 0.352131,
+      "confidence": 0.6989
+    },
+    "연못": {
+      "has": 1,
+      "ratio": 0.089013,
+      "center_x": 0.29277,
+      "center_y": 0.499135,
+      "confidence": 0.6907
+    },
+    "집벽": {
+      "has": 1,
+      "ratio": 0.072241,
+      "center_x": 0.641675,
+      "center_y": 0.341909,
+      "confidence": 0.5986
+    },
+    "지붕": {
+      "has": 1,
+      "ratio": 0.031026,
+      "center_x": 0.509766,
+      "center_y": 0.269043,
+      "confidence": 0.432
+    },
+    "나무": {
+      "has": 1,
+      "ratio": 0.059731,
+      "center_x": 0.687126,
+      "center_y": 0.230983,
+      "confidence": 0.4124
+    },
+    "집전체": {
+      "has": 0,
+      "ratio": 0.0,
+      "center_x": -1,
+      "center_y": -1,
+      "confidence": 0
+    },
+    "굴뚝": {
+      "has": 0,
+      "ratio": 0.0,
+      "center_x": -1,
+      "center_y": -1,
+      "confidence": 0
+    },
+    "연기": {
+      "has": 0,
+      "ratio": 0.0,
+      "center_x": -1,
+      "center_y": -1,
+      "confidence": 0
+    },
+    "산": {
+      "has": 0,
+      "ratio": 0.0,
+      "center_x": -1,
+      "center_y": -1,
+      "confidence": 0
+    },
+    "태양": {
+      "has": 0,
+      "ratio": 0.0,
+      "center_x": -1,
+      "center_y": -1,
+      "confidence": 0
+    }
+  },
+  "detected_classes_kr": [
+    "꽃",
+    "창문",
+    "문",
+    "울타리",
+    "잔디",
+    "길",
+    "연못",
+    "집벽",
+    "지붕",
+    "나무"
+  ],
+  "detection_count": 10,
+  "summary": "집 이미지에서 꽃, 창문, 문, 울타리, 잔디, 길, 연못, 집벽, 지붕, 나무가 감지되었습니다. 꽃가 이미지의 약 3.1%를 차지합니다."
+}
