@@ -1,0 +1,147 @@
+[--- 표 데이터 시작 ---]
+| A StandardizationStudyonDevelopingtheHTP Test |
+| Application;Withafocusonresponsecharacteristics |
+| derivedfrom theHTP TestbasedontheBigFive |
+| PersonalityTest |
+|  |
+
+|  |
+| ThisstudyanalyzestheresponsecharacteristicsoftheHouse-Tree-Person |
+| Test(HTP Test)basedontheBig-FivePersonalityTest. Theresultsofthe |
+| analysiswereusedfordevelopingasmartphoneapplicationthat administers |
+| the HTP test. To analyze the response indicators ofthe HTP Test,a |
+| temporarywebsitewasrunfrom December2014throughJanuary2015,where |
+| subjectsovertheageof20andwithoutanyrelevantexperiencesubmitted |
+| surveysdesignedtocollectHTPdata,totaling363inall. Threeexpertswith |
+| master’sdegreesinarttherapydevisedtheHTP TestAnalysisTablewith |
+| forty-threecategoriesundertheHousepicture,twenty-sevenundertheTree |
+| picture,and thirty-threeunderthePerson pictureby referring to existing |
+| worksonHTPanalysisandcompilingtheindicatorsthatfrequentlyappeared |
+| inthecollected HTPsamplepictures. |
+|  |
+| TheresearchersdividedSouthKoreaintoSeoul/Gyeonggi,Youngnam,Honam, |
+| Choongchung,andGangwonprovincesandconductedtheHTPTestandNEO-II |
+| PersonalityTestonstudentsofelevenuniversitiesineachprovinceduringMarch |
+| 2015. Ofthecollecteddata,783datasampleswereusedasvaliddatasamples. |
+| Inordertovettherelevanceoftheindicatorsanalyzedandthereliabilityamong |
+
+[--- 표 데이터 끝 ---]
+
+
+--- Page 133 ---
+theresearchersanalyzing thedata,theHTP TestAnalysisTableused was
+createdbythethreearttherapyexpertsandfoundthatthedegreeofconsistency
+among theresearcherswas0.97. Theinitialtechnicalstatisticalanalysiswas
+completed using SPSS Windows Ver21.0,afterwhich Dichotomous Logistic
+RegressionAnalysisandMultipleLogisticRegressionAnalysiswasconductedto
+assessthecorrelation among theBig FivePersonality traits,thetwenty-four
+subordinatetraits,andtheHTPindicators.
+Theresultswerethefollowing.AfterconductingaMultipleLogisticRegression
+Analysisusingforty-threecategoriesoftheHouse,twenty-sevenoftheTree,and
+thirty-threeofthePersonasthedependentvariable,statisticallysignificantresultswere
+foundintwentycategoriesoftheHouse(size/location/shapeofthehouse,pressureonthe
+tip of writing utensils, characteristics of lines, shape of the roof, chimney,
+type/number/sizeofwindows,fence,conditionofthefence,veranda,tree,flower,dog
+house,well,windowsontheroof,sun,andtheexistenceofapondorriver),fourteen
+categoriesoftheTree(sizeofthetree,pressureon thetip ofwriting utensils,
+shape/shadowsofthetrunk,locationoftheroots,gnarl,animals,harmonyofthetrunk
+andbranches,fruits,flowers,grassinemptyspace,shapeofbranches,smallbranches
+from thetrunk),and twentycategoriesofthePerson(sizeoftheperson,eyelashes,
+shapesofeyes,nose,mouth,ears,face,legs,hair,andarms;thicknessoftheneck,ratio
+ofheadtothebody,balancebetweenthetwoarms,lengthoflegs,collarsonshirts,
+buttons,tie,shoes,genderoftheperson,andfacialexpressions).
+Second,in conjunction with thisstudy themenu and work floorofthe
+application was organized fortwelve months and began developing theHTP
+applicationbasedonthestatisticalresultsoftheHTPsamples. Theapplication
+wasdevelopedinthefollowingmanner. First,atemporarywebsitewassetup
+fordatacollection,andalistwascreatedofthecollectedHTPsamplepictures,
+designs and assessment categories derived from the pictures.Second,the
+frequentlyobserveddesignsfrom thesampleswereloadedontotheapplicationand
+adatabasewascreated based on theresultsofthisstudy. Thedatawas
+standardized by conducting standardization and generalization studies after
+- 123 -
+
+[--- 표 데이터 시작 ---]
+| theresearchersanalyzing thedata,theHTP TestAnalysisTableused was |
+| createdbythethreearttherapyexpertsandfoundthatthedegreeofconsistency |
+| among theresearcherswas0.97. Theinitialtechnicalstatisticalanalysiswas |
+| completed using SPSS Windows Ver21.0,afterwhich Dichotomous Logistic |
+| RegressionAnalysisandMultipleLogisticRegressionAnalysiswasconductedto |
+| assessthecorrelation among theBig FivePersonality traits,thetwenty-four |
+| subordinatetraits,andtheHTPindicators. |
+|  |
+| Theresultswerethefollowing.AfterconductingaMultipleLogisticRegression |
+| Analysisusingforty-threecategoriesoftheHouse,twenty-sevenoftheTree,and |
+| thirty-threeofthePersonasthedependentvariable,statisticallysignificantresultswere |
+| foundintwentycategoriesoftheHouse(size/location/shapeofthehouse,pressureonthe |
+| tip of writing utensils, characteristics of lines, shape of the roof, chimney, |
+| type/number/sizeofwindows,fence,conditionofthefence,veranda,tree,flower,dog |
+| house,well,windowsontheroof,sun,andtheexistenceofapondorriver),fourteen |
+| categoriesoftheTree(sizeofthetree,pressureon thetip ofwriting utensils, |
+| shape/shadowsofthetrunk,locationoftheroots,gnarl,animals,harmonyofthetrunk |
+| andbranches,fruits,flowers,grassinemptyspace,shapeofbranches,smallbranches |
+| from thetrunk),and twentycategoriesofthePerson(sizeoftheperson,eyelashes, |
+| shapesofeyes,nose,mouth,ears,face,legs,hair,andarms;thicknessoftheneck,ratio |
+| ofheadtothebody,balancebetweenthetwoarms,lengthoflegs,collarsonshirts, |
+| buttons,tie,shoes,genderoftheperson,andfacialexpressions). |
+|  |
+| Second,in conjunction with thisstudy themenu and work floorofthe |
+| application was organized fortwelve months and began developing theHTP |
+| applicationbasedonthestatisticalresultsoftheHTPsamples. Theapplication |
+| wasdevelopedinthefollowingmanner. First,atemporarywebsitewassetup |
+| fordatacollection,andalistwascreatedofthecollectedHTPsamplepictures, |
+| designs and assessment categories derived from the pictures.Second,the |
+| frequentlyobserveddesignsfrom thesampleswereloadedontotheapplicationand |
+| adatabasewascreated based on theresultsofthisstudy. Thedatawas |
+| standardized by conducting standardization and generalization studies after |
+
+[--- 표 데이터 끝 ---]
+
+
+--- Page 134 ---
+analyzing the algorithms ofthe database. In particular,a prototype ofthe
+applicationwascreatedtoprovetheaccuracyoftheprogram. Third,theHTP
+application isdivided into system managerand usersections. Usersofthe
+applicationcandownloadonbothAndroidandIOS platformswellasview the
+analysisoftheirpsychologicalstatebyselectingpreloadedHTP pictures. The
+remainingworkfortheappincludesrevisingandcomplementingtheinterpreting
+capabilitiesoftheapplicationbyaddingtheresultsofthisstudyandconductinga
+betatesttoconfirm theuser-friendlinessanduser-satisfactionoftheapppriorto
+itsrelease.
+The results ofthis study use the implications ofthe Big Five
+Personalitytraitsandtheirsubordinatetraitsasthebasisforinterpreting
+theHTPTestandarelargelyinlinewiththeinterpretationresultsofthe
+preceding studies and the clinicalresults in the field ofarttherapy.
+Somecategoriesofthedatarequirednew perspectivesforinterpretation,
+whichenrichedtheexistingpoolofknownresponsecharacteristics. The
+significanceofthisstudy liesnotonly in discussing thenecessity and
+strengths of an HTP Test app but also in the fact that it has
+standardized the interpretation of the HTP test,thereby allowing for
+production of an application that yields valid interpretation/consistent
+interpretationoftheHTPTest.
+- 124 -
+
+[--- 표 데이터 시작 ---]
+| analyzing the algorithms ofthe database. In particular,a prototype ofthe |
+| applicationwascreatedtoprovetheaccuracyoftheprogram. Third,theHTP |
+| application isdivided into system managerand usersections. Usersofthe |
+| applicationcandownloadonbothAndroidandIOS platformswellasview the |
+| analysisoftheirpsychologicalstatebyselectingpreloadedHTP pictures. The |
+| remainingworkfortheappincludesrevisingandcomplementingtheinterpreting |
+| capabilitiesoftheapplicationbyaddingtheresultsofthisstudyandconductinga |
+| betatesttoconfirm theuser-friendlinessanduser-satisfactionoftheapppriorto |
+| itsrelease. |
+|  |
+| The results ofthis study use the implications ofthe Big Five |
+| Personalitytraitsandtheirsubordinatetraitsasthebasisforinterpreting |
+| theHTPTestandarelargelyinlinewiththeinterpretationresultsofthe |
+| preceding studies and the clinicalresults in the field ofarttherapy. |
+| Somecategoriesofthedatarequirednew perspectivesforinterpretation, |
+| whichenrichedtheexistingpoolofknownresponsecharacteristics. The |
+| significanceofthisstudy liesnotonly in discussing thenecessity and |
+| strengths of an HTP Test app but also in the fact that it has |
+| standardized the interpretation of the HTP test,thereby allowing for |
+| production of an application that yields valid interpretation/consistent |
+| interpretationoftheHTPTest. |
+
+[--- 표 데이터 끝 ---]

@@ -1,0 +1,88 @@
+PI-R)andNEOfive-factorinventory(NEOFFI):Professionalmanual.
+PsychologicalAssessmentResources.
+Dennis,T.A.,& O’Toole,L.J.(2014).Mentalhealthonthego:Effectsof
+gamifiedattention-biasmodificationmobileapplicationintrait-anxious
+adults.ClinicalPsychologicalScience,2,1–15.
+- 119 -
+--- Page 130 ---
+Goldberg.J.P.(1992).ThedevelopmentoftheMarkersfortheBig-Fivestructure,
+PsychologicalAssessment.4.26-42.
+Hammer,E.F.(1958).Theclinicalapplicationofprojectivedrawing.Springfield,
+Illinois:C.C.Thomas.
+Hammer,E.F.(1954).GuideforqualitativeresearchwiththeH-T-P.J.gen.
+Psychol.,51,41-60.
+Hogan,R.T.,&Hogan,J.(1995).HoganPersonalityInventorymanual
+(2nded.).Tulsa,OK:HoganAssessmentSystems.
+Judson,J.,& McCablanda,R.(1960).Anoteontheinfluenceoftheseasonon
+treedrawings.J.elin.Psychol.,16,171-173.
+Jolles,I.(1952).A studyofthevalidityofsomehypothesesforthequalitative
+interpretation oftheH-T-P forchildren ofelementary schoolage:I.
+Sexualidentification.Journalof ClinicalPsychology,8,113-118.
+Kamerow,D.(2013).Regulatingmedicalapps:Whichonesandhow much?
+BritishMedicalJournal,347,f6009.http://dx.doi.org/10.1136/bmj.f6009
+Kim,E.,Lin,J.S.,& Sung,Y.(2013).Toappornottoapp:Engaging
+consumersviabrandedmobileapps.JournalofInteractive
+Advertising,13,53–65.
+Koch,Charles.(1952).Thetreetest.New York:Grune& Stratton.
+Lyons,J.(1955).ThescarontheH-T-Ptree.JournalofClinicalPsychology,
+11(3),267-270
+Malchiodi,C.(2009).Arttherapymeetsdigitalartandsocialmedia.
+http://www.psychologytoday.com/blog/the-healing-arts/200911/art-therapy-
+meets-digital-art-and-social-multimedia
+Marzolf,S.S.,& Kirchner,J.H.(1970).CharacteristicsofHouse-Tree-Person
+DrawingsbyCollegeMenandWomen,JournalofProjective
+TechniquesandPersonalityAssessment,34,138-145.
+Mattson,DonaldC.PhD,(2015),TheArtsinPsychotherapyUsability
+assessmentofamobileappforarttherapy,FloridaUniversity,Art
+Education,UnitedStates.
+McCrae,R.R.,& Costa,P.T.(1987).Validation ofthefive-factormodelof
+personalityacrossinstrumentandobservers.JournalofPersonalityand
+- 120 -
+--- Page 131 ---
+SocialPsychology,52,81-90.
+Moll,R.P.(1962).Furtherevidenceofseasonalinfluencesontreedrawings.
+JournalofClinicalPsychology,18,109.
+MorrisME,KathawalaQ,LeenTK,GorensteinEE,GuilakF,LabhardM,
+Deleeuw W.Mobiletherapy:casestudyevaluationsofacellphone
+applicationforemotionalself-awareness.JMedInternetRes.
+2010;12(2):e10.doi:10.2196/jmir.1371.http://www.jmir.org/2010/2/e10/
+[PMCID:PMC2885784][PubMed:20439251]
+Sunjin“Nancy”Choe.(2014).Anexplorationofthequalitiesandfeaturesofartapps
+forarttherapy.L.A,CA,UnitedStates.
+Orr,P.P.(2012).Technologyuseinarttherapypractice:2004and2011comparison. The
+ArtsinPsychotherapy,EdinboroUnive.,PA,UnitedStates.
+Programs:ASystematicReview,15(11):247. Sydney,Australia.
+Publishedonline2013Nov15.doi:10.2196/jmir.2791
+Wildman,R.(1963).Therelationshipbetweenkneeandarm jointsonhuman
+figuredrawingsandparanoidtrends.Journalof ClinicalPsychology,
+19,460-461.
+- 121 -
+--- Page 132 ---
+A StandardizationStudyonDevelopingtheHTP Test
+Application;Withafocusonresponsecharacteristics
+derivedfrom theHTP TestbasedontheBigFive
+PersonalityTest
+Sohn,Sung-Hee
+DepartmentofRehabilitationScience
+GraduateSchool,DaeguUniversity
+Gyeongbuk,Korea
+SupervisedbyProf,Kong,Maria
+(Abstract)
+ThisstudyanalyzestheresponsecharacteristicsoftheHouse-Tree-Person
+Test(HTP Test)basedontheBig-FivePersonalityTest. Theresultsofthe
+analysiswereusedfordevelopingasmartphoneapplicationthat administers
+the HTP test. To analyze the response indicators ofthe HTP Test,a
+temporarywebsitewasrunfrom December2014throughJanuary2015,where
+subjectsovertheageof20andwithoutanyrelevantexperiencesubmitted
+surveysdesignedtocollectHTPdata,totaling363inall. Threeexpertswith
+master’sdegreesinarttherapydevisedtheHTP TestAnalysisTablewith
+forty-threecategoriesundertheHousepicture,twenty-sevenundertheTree
+picture,and thirty-threeunderthePerson pictureby referring to existing
+worksonHTPanalysisandcompilingtheindicatorsthatfrequentlyappeared
+inthecollected HTPsamplepictures.
+TheresearchersdividedSouthKoreaintoSeoul/Gyeonggi,Youngnam,Honam,
+Choongchung,andGangwonprovincesandconductedtheHTPTestandNEO-II
+PersonalityTestonstudentsofelevenuniversitiesineachprovinceduringMarch
+2015. Ofthecollecteddata,783datasampleswereusedasvaliddatasamples.
+Inordertovettherelevanceoftheindicatorsanalyzedandthereliabilityamong
+- 122 -

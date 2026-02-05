@@ -13,6 +13,7 @@ import sys
 from pathlib import Path
 
 import numpy as np
+import cv2
 from ultralytics import YOLO
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -52,10 +53,26 @@ CLASS_EN_TO_KR = {
 OBJECT_KR = {"tree": "나무", "house": "집", "woman": "여자사람", "man": "남자사람"}
 
 # --------------- 여기서 경로 설정 (아래만 채우고 실행하면 결과가 JSON으로 나옴) ---------------
-IMAGE_PATH = ""   # 입력 이미지 경로. 예: "runs/predict_tree_mvp/7_여_TS_나무_나무_7_여_06136.jpg"
-OBJECT = "tree"   # 모델: "tree" | "house" | "woman" | "man"
-OUTPUT_JSON = ""  # 결과 JSON 파일 경로. 예: "result.json" (비우면 터미널에 출력)
+IMAGE_PATH = r"C:\Honey\Projects\mid-term\AiMind-AiModels\image_to_json\남자사람_7_남_00978.jpg"   # 입력 이미지 경로. 예: "runs/predict_tree_mvp/7_여_TS_나무_나무_7_여_06136.jpg"
+OBJECT = "man"   # 모델: "tree" | "house" | "woman" | "man"
+OUTPUT_JSON = "test_man.json"  # 결과 JSON 파일 경로. 예: "result.json" (비우면 터미널에 출력)
+OUTPUT_IMAGE = "test_man_box.jpg"  # 박스 표시 이미지 저장 경로. 비우면 저장 안 함
+OUTPUT_DIR = r"C:\Honey\Projects\mid-term\AiMind-AiModels\image_to_json\result"  # 배치 출력 폴더 (디렉터리 입력시)
 # -------------------------------------------------------------------------------------------
+
+CUSTOM_WEIGHTS = {
+    "tree": Path(r"C:\Honey\Projects\mid-term\AiMind-AiModels\image_to_json\tree_weights\best.pt"),
+    "man": Path(r"C:\Honey\Projects\mid-term\AiMind-AiModels\image_to_json\man_weights\best.pt"),
+    "woman": Path(r"C:\Honey\Projects\mid-term\AiMind-AiModels\image_to_json\woman_weights\best.pt"),
+    "house": Path(r"C:\Honey\Projects\mid-term\AiMind-AiModels\image_to_json\house_weights\weights\best.pt"),
+}
+
+FILENAME_PREFIX_TO_OBJECT = {
+    "나무": "tree",
+    "남자사람": "man",
+    "여자사람": "woman",
+    "집": "house",
+}
 
 
 def find_weights(run_name: str) -> Path:
@@ -191,10 +208,27 @@ def build_rag_output(r, path: Path, object_type: str, weights: Path, w: int, h: 
     }
 
 
-def run(image_path: str, object_type: str, conf: float = CONF_DEFAULT, iou: float = IOU_DEFAULT, output_format: str = "raw") -> dict:
+def _save_annotated_image(r, output_image: Path) -> None:
+    output_image.parent.mkdir(parents=True, exist_ok=True)
+    plotted = r.plot()
+    cv2.imwrite(str(output_image), plotted)
+
+
+def run(
+    image_path: str,
+    object_type: str,
+    conf: float = CONF_DEFAULT,
+    iou: float = IOU_DEFAULT,
+    output_format: str = "raw",
+    output_image_path: str | None = None,
+) -> dict:
     """이미지 1장 추론 후 JSON용 dict 반환. output_format: raw | rag."""
     run_name = CONFIG_MAP[object_type]
-    weights = find_weights(run_name)
+    custom_weights = CUSTOM_WEIGHTS.get(object_type)
+    if custom_weights is not None and custom_weights.exists():
+        weights = custom_weights
+    else:
+        weights = find_weights(run_name)
     if not weights.exists():
         raise FileNotFoundError(f"모델 없음: {weights}. 먼저 학습: python src/02_train_yolo_seg_htp.py --object {object_type}")
 
@@ -238,6 +272,12 @@ def run(image_path: str, object_type: str, conf: float = CONF_DEFAULT, iou: floa
 
     r = results[0]
     h, w = int(r.orig_shape[0]), int(r.orig_shape[1])
+
+    if output_image_path:
+        out_img = Path(output_image_path)
+        if not out_img.is_absolute():
+            out_img = (ROOT / out_img).resolve()
+        _save_annotated_image(r, out_img)
 
     if output_format == "rag":
         return build_rag_output(r, path, object_type, weights, w, h)
@@ -293,6 +333,48 @@ def run(image_path: str, object_type: str, conf: float = CONF_DEFAULT, iou: floa
     return out
 
 
+def _detect_object_type_from_filename(filename: str) -> str | None:
+    for prefix, obj in FILENAME_PREFIX_TO_OBJECT.items():
+        if filename.startswith(prefix):
+            return obj
+    return None
+
+
+def run_batch_dir(input_dir: Path, output_dir: Path, conf: float, iou: float, output_format: str) -> None:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    image_files = [
+        p for p in sorted(input_dir.iterdir())
+        if p.is_file() and p.suffix.lower() in {".jpg", ".jpeg", ".png", ".bmp"}
+    ]
+    if not image_files:
+        print(f"입력 폴더에 이미지가 없습니다: {input_dir}", file=sys.stderr)
+        return
+
+    for img_path in image_files:
+        obj = _detect_object_type_from_filename(img_path.name)
+        if obj is None:
+            print(f"[SKIP] 타입 추정 실패: {img_path.name}", file=sys.stderr)
+            continue
+        out_json = output_dir / f"{img_path.stem}.json"
+        out_img = output_dir / f"{img_path.stem}_box.jpg"
+        try:
+            result = run(
+                str(img_path),
+                obj,
+                conf=conf,
+                iou=iou,
+                output_format=output_format,
+                output_image_path=str(out_img),
+            )
+        except FileNotFoundError as e:
+            print(str(e), file=sys.stderr)
+            continue
+        s = json.dumps(result, ensure_ascii=False, indent=2)
+        out_json.write_text(s, encoding="utf-8")
+        n = result.get("detection_count", len(result.get("detections", [])))
+        print(f"[DONE] {img_path.name} ({obj}) -> {n} detections")
+
+
 def main():
     parser = argparse.ArgumentParser(description="이미지 1장 → 학습 모델 감지·분류 → JSON (경로는 파일 상단 IMAGE_PATH 등으로도 설정 가능)")
     parser.add_argument("--image", "-i", default=None, help="입력 이미지 경로 (없으면 위 IMAGE_PATH 사용)")
@@ -301,24 +383,44 @@ def main():
     parser.add_argument("--conf", type=float, default=CONF_DEFAULT, help=f"신뢰도 임계값 (기본 {CONF_DEFAULT})")
     parser.add_argument("--iou", type=float, default=IOU_DEFAULT, help=f"NMS IoU (기본 {IOU_DEFAULT})")
     parser.add_argument("--output", "-O", default=None, help="JSON 저장 경로 (없으면 위 OUTPUT_JSON, 비우면 stdout)")
+    parser.add_argument("--output-image", "-I", default=None, help="박스 표시 이미지 저장 경로 (없으면 위 OUTPUT_IMAGE, 비우면 저장 안 함)")
+    parser.add_argument("--output-dir", "-D", default=None, help="디렉터리 입력시 결과 저장 폴더 (없으면 위 OUTPUT_DIR)")
     parser.add_argument("--indent", type=int, default=2, help="JSON 들여쓰기 (0=한 줄)")
     args = parser.parse_args()
 
     image_path = args.image or IMAGE_PATH
     object_type = args.object or OBJECT
     output_path = args.output if args.output is not None else (OUTPUT_JSON if OUTPUT_JSON else None)
+    output_image_path = args.output_image if args.output_image is not None else (OUTPUT_IMAGE if OUTPUT_IMAGE else None)
+    output_dir = args.output_dir if args.output_dir is not None else (OUTPUT_DIR if OUTPUT_DIR else None)
 
     if not image_path or not image_path.strip():
         print("입력 이미지 경로가 없습니다. 파일 상단 IMAGE_PATH 를 설정하거나 --image 로 지정하세요.", file=sys.stderr)
         sys.exit(1)
     image_path = image_path.strip()
+
+    path_obj = Path(image_path)
+    if path_obj.is_dir():
+        out_dir = Path(output_dir) if output_dir else (path_obj / "result")
+        if not out_dir.is_absolute():
+            out_dir = (ROOT / out_dir).resolve()
+        run_batch_dir(path_obj, out_dir, conf=args.conf, iou=args.iou, output_format=args.format)
+        return
+
     object_type = (object_type or "tree").strip() if isinstance(object_type, str) else "tree"
     if object_type not in ("tree", "house", "woman", "man"):
         print("object 는 tree / house / woman / man 중 하나여야 합니다. 파일 상단 OBJECT 를 확인하세요.", file=sys.stderr)
         sys.exit(1)
 
     try:
-        result = run(image_path, object_type, conf=args.conf, iou=args.iou, output_format=args.format)
+        result = run(
+            image_path,
+            object_type,
+            conf=args.conf,
+            iou=args.iou,
+            output_format=args.format,
+            output_image_path=output_image_path,
+        )
     except FileNotFoundError as e:
         print(str(e), file=sys.stderr)
         sys.exit(1)

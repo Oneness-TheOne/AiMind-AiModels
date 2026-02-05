@@ -18,6 +18,9 @@ import time
 from dotenv import load_dotenv
 load_dotenv()
 
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+DEFAULT_IMAGE_JSON_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "image_to_json", "result"))
+
 
 def cmd_ingest(args: argparse.Namespace) -> None:
     """워크플로우 1: PDF → JSON → ChromaDB"""
@@ -59,34 +62,98 @@ def cmd_interpret(args: argparse.Namespace) -> None:
         print(f"  상세: {e}")
         sys.exit(1)
 
-    with open(args.input, "r", encoding="utf-8") as f:
-        original = json.load(f)
-
-    # 새 형식(features + image_size)이면 기존 형식(meta + annotations.bbox)으로 변환
-    try:
-        from legacy_converter import is_new_format, convert_new_to_legacy
-        if is_new_format(original):
-            original = convert_new_to_legacy(original, args.input)
-    except ImportError:
-        pass
-
     api_key = getattr(args, "api_key", None) or os.getenv("GEMINI_API_KEY")
     if not api_key:
         print("✗ GEMINI_API_KEY가 필요합니다. (환경변수 또는 --api-key)")
         sys.exit(1)
 
-    t0 = time.perf_counter()
-    results = analyze_and_interpret(
-        original,
-        model_name=getattr(args, "model", "gemini-2.5-flash-lite"),
-        api_key=api_key,
-        temperature=getattr(args, "temperature", 0.7),
-        use_rag=not getattr(args, "no_rag", False),
-        rag_db_path=getattr(args, "rag_db_path", None),
-        rag_k=getattr(args, "rag_k", 10),
-        max_output_tokens=getattr(args, "max_output_tokens", 8192),
-    )
+    output_dir = getattr(args, "output", None) or "results"
 
+    def _convert_if_needed(data, source_path):
+        try:
+            from legacy_converter import is_new_format, convert_new_to_legacy
+            if is_new_format(data):
+                return convert_new_to_legacy(data, source_path)
+        except ImportError:
+            pass
+        return data
+
+    def _save_results_with_stem(results, out_dir, stem):
+        os.makedirs(out_dir, exist_ok=True)
+        if results.get("analysis"):
+            analysis_file = os.path.join(out_dir, f"analysis_{stem}.json")
+            with open(analysis_file, "w", encoding="utf-8") as f:
+                json.dump(results["analysis"], f, ensure_ascii=False, indent=2)
+            print(f"✓ 분석 결과 저장: {analysis_file}")
+        if results.get("interpretation"):
+            interpretation_file = os.path.join(out_dir, f"interpretation_{stem}.json")
+            with open(interpretation_file, "w", encoding="utf-8") as f:
+                json.dump(results["interpretation"], f, ensure_ascii=False, indent=2)
+            print(f"✓ 해석 결과 저장: {interpretation_file}")
+        combined_file = os.path.join(out_dir, f"combined_{stem}.json")
+        with open(combined_file, "w", encoding="utf-8") as f:
+            json.dump(results, f, ensure_ascii=False, indent=2)
+        print(f"✓ 통합 결과 저장: {combined_file}")
+
+    def _run_single(path):
+        with open(path, "r", encoding="utf-8") as f:
+            original = json.load(f)
+        original = _convert_if_needed(original, path)
+        t0 = time.perf_counter()
+        results = analyze_and_interpret(
+            original,
+            model_name=getattr(args, "model", "gemini-2.5-flash-lite"),
+            api_key=api_key,
+            temperature=getattr(args, "temperature", 0.7),
+            use_rag=not getattr(args, "no_rag", False),
+            rag_db_path=getattr(args, "rag_db_path", None),
+            rag_k=getattr(args, "rag_k", 10),
+            max_output_tokens=getattr(args, "max_output_tokens", 8192),
+        )
+        elapsed = time.perf_counter() - t0
+        return results, elapsed
+
+    if os.path.isdir(args.input):
+        json_paths = [
+            os.path.join(args.input, name)
+            for name in os.listdir(args.input)
+            if name.lower().endswith(".json")
+        ]
+        json_paths = [p for p in json_paths if os.path.isfile(p)]
+        json_paths.sort(key=lambda p: os.path.basename(p).casefold())
+        if not json_paths:
+            print(f"✗ JSON 파일을 찾을 수 없습니다: {args.input}")
+            sys.exit(1)
+
+        for i, path in enumerate(json_paths, 1):
+            stem = os.path.splitext(os.path.basename(path))[0]
+            print(f"\n[{i}/{len(json_paths)}] {path}")
+            results, elapsed = _run_single(path)
+            if not results.get("success"):
+                print(f"✗ 해석 실패: {results.get('error')}")
+                if results.get("raw_response"):
+                    print("\n[원본 응답 (처음 500자)]")
+                    print(results["raw_response"][:500])
+                continue
+            print("✓ 해석 성공")
+            analysis = results.get("analysis") or {}
+            interp = results.get("interpretation") or {}
+            if analysis:
+                meta = analysis.get("이미지_메타정보", {})
+                print("\n[분석 요약] 연령:", meta.get("연령"), "성별:", meta.get("성별"), "요소 수:", len(analysis.get("요소_개수", {})))
+            if interp:
+                if "전체_요약" in interp:
+                    print("\n[해석 요약]", interp["전체_요약"][:200] + "..." if len(interp["전체_요약"]) > 200 else interp["전체_요약"])
+            _save_results_with_stem(results, output_dir, stem)
+            timing = results.get("timing") or {}
+            if timing:
+                a, r, l_ = timing.get("analysis_sec", 0), timing.get("rag_sec", 0), timing.get("llm_sec", 0)
+                print(f"   └ 분석: {a:.1f}초 | RAG(ChromaDB): {r:.1f}초 | LLM(Gemini): {l_:.1f}초")
+            print(f"⏱ 소요 시간: {elapsed:.1f}초")
+        print("\n✓ 배치 완료")
+        return
+
+    results, elapsed = _run_single(args.input)
     if not results.get("success"):
         print(f"✗ 해석 실패: {results.get('error')}")
         if results.get("raw_response"):
@@ -104,10 +171,9 @@ def cmd_interpret(args: argparse.Namespace) -> None:
         if "전체_요약" in interp:
             print("\n[해석 요약]", interp["전체_요약"][:200] + "..." if len(interp["전체_요약"]) > 200 else interp["전체_요약"])
 
-    if getattr(args, "output", None):
-        save_results(results, output_dir=args.output)
+    if output_dir:
+        save_results(results, output_dir=output_dir)
 
-    elapsed = time.perf_counter() - t0
     print(f"\n⏱ 총 소요 시간: {elapsed:.1f}초 (시작 → JSON 저장까지)")
     timing = results.get("timing") or {}
     if timing:
@@ -132,8 +198,13 @@ def build_parser() -> argparse.ArgumentParser:
 
     # 2) interpret: 원본 JSON → 분석 → RAG → LLM
     p_interp = sub.add_parser("interpret", help="원본 그림 JSON → 중간 분석 → RAG → LLM 해석")
-    p_interp.add_argument("input", help="원본 그림 라벨링 JSON 경로")
-    p_interp.add_argument("-o", "--output", help="결과 저장 디렉터리 (analysis/interpretation/combined JSON)")
+    p_interp.add_argument(
+        "input",
+        nargs="?",
+        default=DEFAULT_IMAGE_JSON_DIR,
+        help=f"원본 그림 라벨링 JSON 경로 또는 JSON 폴더 경로 (기본: {DEFAULT_IMAGE_JSON_DIR})",
+    )
+    p_interp.add_argument("-o", "--output", default="results", help="결과 저장 디렉터리 (analysis/interpretation/combined JSON)")
     p_interp.add_argument("-m", "--model", default="gemini-2.5-flash-lite", help="Gemini 모델 (기본: gemini-2.5-flash-lite)")
     p_interp.add_argument("--api-key", help="Gemini API 키 (미지정 시 GEMINI_API_KEY)")
     p_interp.add_argument("--temperature", type=float, default=0.2, help="생성 온도 (기본: 0.2)")
