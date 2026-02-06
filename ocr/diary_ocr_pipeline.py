@@ -11,6 +11,7 @@ import gc
 import re
 import json
 import warnings
+from datetime import datetime
 
 import torch
 import cv2
@@ -18,20 +19,15 @@ import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image, ImageDraw
 from transformers import AutoProcessor, LlavaOnevisionForConditionalGeneration, BitsAndBytesConfig
-import requests
 import google.generativeai as genai
+from dotenv import load_dotenv
+
+# .env 파일에서 GEMINI_API_KEY 등 로드
+load_dotenv()
 
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
-# API 키 (환경변수로 덮어쓰기 가능)
-os.environ.setdefault("GEMINI_API_KEY", "AIzaSyDSzvSft8Qxwp2I3vl6SmFBUmv7rz4l8lA")
-os.environ.setdefault("OPENWEATHERMAP_API_KEY", "856d814f636cc3d1cd057d5bfcdb363a")
-
-AREA_COORDS = {
-    "도봉구": (37.6688, 127.0471),
-    "강남구": (37.5146, 127.0496),
-    "속초시": (38.2070, 128.5918),
-}
+# API 키는 .env 에서 읽어 사용 (GOOGLE_API_KEY, GEMINI_API_KEY 등)
 
 # 전역 (모델 로드 후 설정)
 model = None
@@ -217,6 +213,43 @@ def adaptive_cleanup(image):
     return final_output
 
 
+def extract_drawing_from_diary(warped_bgr, diary_type, output_dir="./ocr/img", base_name="drawing"):
+    """
+    그림일기에서 그림 영역만 추출하여 컬러로 저장.
+    warped_bgr: 4점 투영 변환 완료된 BGR 이미지
+    diary_type: "horizontal" | "vertical"
+    Returns: (img_path: str, drawing_grayscale: np.ndarray)
+    """
+    h, w = warped_bgr.shape[:2]
+
+    if diary_type == "horizontal":
+        # 가로 버전: 왼쪽 페이지만 사용, weight_image_crop_process 크롭
+        img_for_crop = warped_bgr[:, : w // 2]
+        CROP_TOP, CROP_BOTTOM, CROP_LEFT = 0.20, 0.05, 0.10
+        CROP_RIGHT = 0  # 우측 유지
+    else:
+        # 세로 버전: 전체 사용, length_image_crop_process 크롭
+        img_for_crop = warped_bgr
+        CROP_TOP, CROP_BOTTOM, CROP_LEFT, CROP_RIGHT = 0.22, 0.35, 0.03, 0.03
+
+    height, width = img_for_crop.shape[:2]
+    x_start = int(width * CROP_LEFT)
+    x_end = width if diary_type == "horizontal" else int(width * (1 - CROP_RIGHT))
+    y_start = int(height * CROP_TOP)
+    y_end = int(height * (1 - CROP_BOTTOM))
+
+    cropped_bgr = img_for_crop[y_start:y_end, x_start:x_end].copy()
+
+    os.makedirs(output_dir, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"{base_name}_{timestamp}.jpg"
+    img_path = os.path.join(output_dir, filename)
+    cv2.imwrite(img_path, cropped_bgr)
+
+    drawing_grayscale = cv2.cvtColor(cropped_bgr, cv2.COLOR_BGR2GRAY)
+    return img_path, drawing_grayscale
+
+
 def preprocess_diary_image(file_path, show_result=False, use_color_for_ocr=True, return_detection_vis=False):
     """문서 영역 보정 + cleanup. return_detection_vis=True면 원본에 탐지된 문서 영역(4각형) 그린 이미지도 반환."""
     image = cv2.imread(file_path)
@@ -257,11 +290,17 @@ def preprocess_diary_image(file_path, show_result=False, use_color_for_ocr=True,
             for i, pt in enumerate(pts_orig):
                 cv2.circle(detection_vis_bgr, tuple(pt), 8, (0, 0, 255), -1)
                 cv2.putText(detection_vis_bgr, str(i + 1), tuple(pt), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+
     h_warped, w_warped = warped.shape[:2]
     is_horizontal = w_warped > h_warped
+    diary_type = "horizontal" if is_horizontal else "vertical"
+    base_name = os.path.splitext(os.path.basename(file_path))[0]
+    output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "img")
+    img_path, _ = extract_drawing_from_diary(warped, diary_type, output_dir=output_dir, base_name=base_name)
+
     if is_horizontal:
-        left_half = warped[:, : w_warped // 2]
-        right_half = warped[:, w_warped // 2 :]
+        left_half = warped[:, :w_warped // 2]
+        right_half = warped[:, w_warped // 2:]
         h_left, w_left = left_half.shape[:2]
         left_cropped = left_half[0 : int(h_left * 0.2), 0 : int(w_left * 0.70)]
         left_clean = adaptive_cleanup(left_cropped)
@@ -282,7 +321,7 @@ def preprocess_diary_image(file_path, show_result=False, use_color_for_ocr=True,
             imshow("Left (top20%, left55%)", left_clean)
             imshow("Right page", right_clean)
         det = detection_vis_bgr if return_detection_vis else None
-        return left_pil, right_pil, final_bgr, det, "horizontal"
+        return left_pil, right_pil, final_bgr, det, "horizontal", img_path
     else:
         if return_detection_vis and detection_vis_bgr is not None:
             cv2.putText(detection_vis_bgr, "Vertical version: full image", (50, 90), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 165, 255), 2)
@@ -291,9 +330,10 @@ def preprocess_diary_image(file_path, show_result=False, use_color_for_ocr=True,
         pil_image = Image.fromarray(cv2.cvtColor(final_result, cv2.COLOR_GRAY2RGB))
         if show_result:
             imshow("Smart Clean Scan Result", final_result)
+        det = detection_vis_bgr if return_detection_vis else None
         if return_detection_vis and detection_vis_bgr is not None:
-            return pil_image, final_bgr, detection_vis_bgr, "vertical"
-        return pil_image, final_bgr, "vertical"
+            return pil_image, final_bgr, detection_vis_bgr, "vertical", img_path
+        return pil_image, final_bgr, "vertical", img_path
 
 
 def _normalize_date(date_str: str) -> str:
@@ -310,23 +350,6 @@ def _normalize_date(date_str: str) -> str:
             y, mo, d = int(g[0]), int(g[1]) if len(g) > 1 else 1, int(g[2]) if len(g) > 2 else 1
             return f"{y:04d}-{mo:02d}-{d:02d}"
     return date_str
-
-
-def _get_weather_for_diary(date_str: str, area: str) -> str:
-    api_key = os.environ.get("OPENWEATHERMAP_API_KEY", "")
-    if not api_key or not api_key.strip():
-        return "5°C, 맑음"
-    if area not in AREA_COORDS:
-        return "5°C, 맑음"
-    lat, lon = AREA_COORDS[area]
-    url = f"https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={api_key}&units=metric&lang=kr"
-    try:
-        resp = requests.get(url, timeout=5)
-        resp.raise_for_status()
-        data = resp.json()
-        return f"{round(data['main']['temp'])}°C, {data['weather'][0]['description']}"
-    except Exception:
-        return "5°C, 맑음"
 
 
 def _extract_diary_info_gemini(text: str) -> dict:
@@ -356,7 +379,7 @@ def _extract_diary_info_gemini(text: str) -> dict:
     return data
 
 
-def process_diary_text(text: str, area: str | None = None) -> dict:
+def process_diary_text(text: str) -> dict:
     """OCR 결과를 Gemini로 분석하여 날짜·제목·내용 추출."""
     result = {"원본": text}
     try:
@@ -364,8 +387,6 @@ def process_diary_text(text: str, area: str | None = None) -> dict:
         result["날짜"] = extracted.get("날짜", "")
         result["제목"] = extracted.get("제목", "")
         result["내용"] = extracted.get("내용", "")
-        if area:
-            result["날씨"] = _get_weather_for_diary(result["날짜"], area)
     except Exception as e:
         result["오류"] = str(e)
     return result
@@ -388,7 +409,6 @@ def run(
     show_detection: bool = True,
     save_detection_images: bool = False,
     diary_mode: bool = False,
-    diary_area: str = "도봉구",
     show_progress: bool = True,
 ):
     """그림일기 이미지 경로로 전처리 → OCR → Gemini 후처리 → 결과 출력."""
@@ -408,13 +428,12 @@ def run(
     try:
         prog(10, "전처리 중 (문서 영역 탐지·보정)...")
         result = preprocess_diary_image(file_path, show_result=show_preprocess, return_detection_vis=True)
-        version = None
 
-        if len(result) == 5:
-            left_pil, right_pil, preprocessed_bgr, detection_vis_bgr, version = result
-            prog(20, "OCR 진행 중 (왼쪽 페이지)...")
+        prog(30, "OCR 진행 중...")
+        img_path = None
+        if len(result) == 6:
+            left_pil, right_pil, preprocessed_bgr, detection_vis_bgr, version, img_path = result
             raw_left, text_boxes_left, full_text_left, pil_left_sent = run_varco_ocr(left_pil, max_long_side=max_long_side, diary_mode=diary_mode)
-            prog(40, "OCR 진행 중 (오른쪽 페이지)...")
             raw_right, text_boxes_right, full_text_right, pil_right_sent = run_varco_ocr(right_pil, max_long_side=max_long_side, diary_mode=diary_mode)
             full_text = full_text_left + full_text_right
             raw_output = (raw_left or "") + "\n" + (raw_right or "")
@@ -435,24 +454,24 @@ def run(
             pil_image_sent = Image.new("RGB", (w_comb, h_comb), (255, 255, 255))
             pil_image_sent.paste(pil_left_sent, (0, 0))
             pil_image_sent.paste(pil_right_sent, (w_left, 0))
-        elif len(result) == 4:
-            pil_image, preprocessed_bgr, detection_vis_bgr, version = result
-            prog(30, "OCR 진행 중 (세로 버전)...")
+        elif len(result) == 5:
+            pil_image, preprocessed_bgr, detection_vis_bgr, version, img_path = result
             raw_output, text_boxes, full_text, pil_image_sent = run_varco_ocr(pil_image, max_long_side=max_long_side, diary_mode=diary_mode)
-        elif len(result) == 3:
-            pil_image, preprocessed_bgr, version = result
+        elif len(result) == 4:
+            pil_image, preprocessed_bgr, version, img_path = result
             detection_vis_bgr = None
-            prog(30, "OCR 진행 중 (세로 버전)...")
             raw_output, text_boxes, full_text, pil_image_sent = run_varco_ocr(pil_image, max_long_side=max_long_side, diary_mode=diary_mode)
         else:
-            pil_image, preprocessed_bgr = result
+            pil_image, preprocessed_bgr, *rest = result
             detection_vis_bgr = None
-            version = None
-            prog(30, "OCR 진행 중...")
+            version = rest[0] if len(rest) >= 1 else None
+            img_path = rest[1] if len(rest) >= 2 else None
             raw_output, text_boxes, full_text, pil_image_sent = run_varco_ocr(pil_image, max_long_side=max_long_side, diary_mode=diary_mode)
 
         prog(50, "OCR 완료. 텍스트 후처리 중...")
         print(f"\n전처리 완료: {file_path}" + (f" ({version} version)" if version else ""))
+        if img_path:
+            print(f"그림 영역 저장: {img_path}")
 
         if detection_vis_bgr is not None:
             if show_detection:
@@ -479,7 +498,9 @@ def run(
 
         display_text = get_diary_text(raw_output, full_text)
         prog(60, "Gemini로 일기 분석 중 (날짜·제목·내용 추출)...")
-        diary_result = process_diary_text(display_text, area=diary_area)
+        diary_result = process_diary_text(display_text)
+        if img_path:
+            diary_result["그림_저장경로"] = img_path
         prog(80, "Gemini 분석 완료. 결과 정리 중...")
         diary_result_json = json.dumps(diary_result, ensure_ascii=False, indent=2)
 
@@ -565,16 +586,16 @@ def run(
 
 if __name__ == "__main__":
     # 설정
-    file_path = "2page15.jpg"
+    file_path = "ocr/2page8.jpg"
     max_long_side = 512
     show_preprocess = True
     show_detection = True
     save_detection_images = False
     diary_mode = False
-    diary_area = "도봉구"
 
     # 선택: CUDA 환경 확인
     # check_cuda()
+    
 
     run(
         file_path=file_path,
@@ -583,7 +604,6 @@ if __name__ == "__main__":
         show_detection=show_detection,
         save_detection_images=save_detection_images,
         diary_mode=diary_mode,
-        diary_area=diary_area,
         show_progress=True,  # 진행률 표시 (False면 비활성화)
     )
 
