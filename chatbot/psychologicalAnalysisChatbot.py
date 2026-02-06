@@ -50,3 +50,11 @@ def ask_psych_analysis(question: str, age: int, gender: str):
         "age": age,
         "gender": gender
     })
+
+if __name__ == "__main__":
+    question = input('분석 결과에 대한 질문을 입력해 주세요! ')
+    if question:
+        response = ask_psych_analysis(question, 8, "여")
+        print('심리 분석 챗봇 답변:', response)
+    else:
+        print('답변 실패, 질문을 입력해 주세요.')
