@@ -2,7 +2,11 @@ import os
 import json
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
-from .guideChatbot import get_common_llm  # 공통 LLM 함수 사용
+try:
+    from .guideChatbot import get_common_llm  # 공통 LLM 함수 사용
+except ImportError:
+    # 스크립트 직접 실행 시(relative import 실패) fallback
+    from guideChatbot import get_common_llm
 
 
 def find_analysis_json(age, gender):
