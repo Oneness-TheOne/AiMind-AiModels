@@ -11,7 +11,9 @@ import time
 import warnings
 from tree_analyzer import process_json
 from interpretation_prompts import get_interpretation_prompt
-from htp_indicator_parser import SOURCE_FIELD
+
+# RAG 메타데이터 키 (htp_indicator_parser 미import로 interpret 단독 실행 시 의존성 경량화)
+SOURCE_FIELD = "source"
 
 # google.generativeai deprecated 경고 무시 (현재 API는 동작함)
 warnings.filterwarnings("ignore", message=".*google.generativeai.*", category=FutureWarning)
