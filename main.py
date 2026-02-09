@@ -11,7 +11,7 @@ from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from AI.chatbot.guideChatbot import get_chatbot_answer
+from chatbot.guideChatbot import get_chatbot_answer
 
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
