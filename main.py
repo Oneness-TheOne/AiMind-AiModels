@@ -67,6 +67,7 @@ app.add_middleware(
 
 class ChatbotRequest(BaseModel):
     question: str
+    analysis_context: dict | None = None
 
 
 class ChatbotResponse(BaseModel):
@@ -79,7 +80,7 @@ def chatbot(payload: ChatbotRequest):
     question = payload.question.strip()
     if not question:
         raise HTTPException(status_code=400, detail="질문을 입력해 주세요.")
-    answer = get_chatbot_answer(question)
+    answer = get_chatbot_answer(question, analysis_context=payload.analysis_context)
 
     if not answer:
         raise HTTPException(status_code=500, detail="답변을 준비할 수 없습니다.")
