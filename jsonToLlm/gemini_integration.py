@@ -8,22 +8,22 @@ RAG: ChromaDB에 저장된 HTP 지표를 먼저 검색해 참고 지표로 넣�
 import json
 import os
 import time
-import warnings
 from tree_analyzer import process_json
 from interpretation_prompts import get_interpretation_prompt
 
 # RAG 메타데이터 키 (htp_indicator_parser 미import로 interpret 단독 실행 시 의존성 경량화)
 SOURCE_FIELD = "source"
 
-# google.generativeai deprecated 경고 무시 (현재 API는 동작함)
-warnings.filterwarnings("ignore", message=".*google.generativeai.*", category=FutureWarning)
 try:
-    import google.generativeai as genai
+    from google import genai
+    from google.genai import types
     GEMINI_AVAILABLE = True
 except ImportError:
+    genai = None
+    types = None
     GEMINI_AVAILABLE = False
-    print("경고: google-generativeai 패키지가 설치되지 않았습니다.")
-    print("설치 방법: pip install google-generativeai")
+    print("경고: google-genai 패키지가 설치되지 않았습니다.")
+    print("설치 방법: pip install google-genai")
 
 DEFAULT_MODEL = "gemini-2.5-flash-lite"
 
@@ -39,21 +39,20 @@ except ImportError:
 
 def setup_gemini(api_key=None):
     """
-    Gemini API 설정
+    Gemini API 클라이언트 생성 (google.genai SDK 사용).
     
     Args:
-        api_key: Gemini API 키 (없으면 환경변수에서 가져옴)
+        api_key: Gemini API 키 (없으면 환경변수 GEMINI_API_KEY 사용)
     """
     if not GEMINI_AVAILABLE:
-        raise ImportError("google-generativeai 패키지가 필요합니다. pip install google-generativeai")
+        raise ImportError("google-genai 패키지가 필요합니다. pip install google-genai")
     
     if api_key is None:
         api_key = os.getenv('GEMINI_API_KEY')
         if api_key is None:
             raise ValueError("API 키가 필요합니다. api_key 파라미터로 전달하거나 GEMINI_API_KEY 환경변수를 설정하세요.")
     
-    genai.configure(api_key=api_key)
-    return genai
+    return genai.Client(api_key=api_key)
 
 
 def _build_rag_query_from_analysis(analysis_data):
@@ -177,8 +176,8 @@ def interpret_with_gemini(analysis_result, model_name=None, api_key=None, temper
     timing = {"rag_sec": 0.0, "llm_sec": 0.0}
     if model_name is None:
         model_name = DEFAULT_MODEL
-    # Gemini 설정
-    genai = setup_gemini(api_key)
+    # Gemini 클라이언트 (google.genai SDK)
+    client = setup_gemini(api_key)
     
     # RAG: 분석 결과로 ChromaDB 검색 후 참고 지표 문자열·참고 논문 목록 생성
     rag_context = ""
@@ -196,28 +195,26 @@ def interpret_with_gemini(analysis_result, model_name=None, api_key=None, temper
         references=references if references else None,
     )
     
-    # 모델 생성
-    model = genai.GenerativeModel(model_name)
-    
     # 생성 설정 (해석 JSON이 길어지므로 토큰 상한 확대, 잘림 방지)
-    generation_config = {
-        "temperature": temperature,
-        "top_p": 0.95,
-        "top_k": 40,
-        "max_output_tokens": max_output_tokens,
-    }
+    config = types.GenerateContentConfig(
+        temperature=temperature,
+        top_p=0.95,
+        top_k=40,
+        max_output_tokens=max_output_tokens,
+    )
     
     try:
         # Gemini에 요청 (가장 시간 많이 소요)
         t0 = time.perf_counter()
-        response = model.generate_content(
-            prompt,
-            generation_config=generation_config
+        response = client.models.generate_content(
+            model=model_name,
+            contents=prompt,
+            config=config,
         )
         timing["llm_sec"] = time.perf_counter() - t0
         
-        # 응답 텍스트 추출
-        response_text = response.text
+        # 응답 텍스트 추출 (google.genai SDK는 response.text)
+        response_text = response.text if hasattr(response, "text") and response.text else ""
         
         # JSON 파싱 시도
         try:
