@@ -148,7 +148,8 @@ def compute_scores_for_analysis(
     sex: str,
 ) -> dict[str, Any]:
     """
-    analyze 응답의 results에서 각 객체별 T-Score를 계산하고 집계합니다.
+    업로드한 그림 4장(tree/house/man/woman)의 image_json만 사용하여 T-Score를 계산합니다.
+    results는 /analyze 응답의 results이며, 각 객체별 image_json은 해당 업로드 이미지 처리 결과입니다.
 
     Returns:
         {
@@ -172,9 +173,11 @@ def compute_scores_for_analysis(
 
     for obj_key, label_kr in type_map.items():
         r = results.get(obj_key)
-        if not r:
+        if not r or not isinstance(r, dict):
             continue
-        img_json = r.get("image_json") or {}
+        img_json = r.get("image_json")
+        if not img_json or not isinstance(img_json, dict) or "features" not in img_json:
+            continue
         s = calculate_drawing_score_from_json(img_json, label_kr, age, sex)
         if s:
             by_object[obj_key] = s

@@ -32,29 +32,23 @@ os.environ.setdefault("UVICORN_PORT", aimodels_port)
 app = FastAPI()
 
 BASE_DIR = Path(current_dir)
+# 그림 분석(/analyze) 전용 경로
 IMAGE_TO_JSON_DIR = BASE_DIR / "image_to_json"
 IMAGE_UPLOAD_DIR = IMAGE_TO_JSON_DIR / "uploads"
 IMAGE_RESULT_DIR = IMAGE_TO_JSON_DIR / "result"
 JSON_TO_LLM_DIR = BASE_DIR / "jsonToLlm"
 JSON_TO_LLM_RESULTS_DIR = JSON_TO_LLM_DIR / "results"
-OCR_DIR = BASE_DIR / "ocr"
-OCR_UPLOAD_DIR = OCR_DIR / "uploads"
-OCR_RESULT_DIR = OCR_DIR / "results"
 LABEL_STATS_PATH = BASE_DIR / "data" / "label_stats_by_group.json"
 LABEL_STATS_CACHE = None
 
 IMAGE_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 IMAGE_RESULT_DIR.mkdir(parents=True, exist_ok=True)
 JSON_TO_LLM_RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-OCR_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-OCR_RESULT_DIR.mkdir(parents=True, exist_ok=True)
 
 if str(IMAGE_TO_JSON_DIR) not in sys.path:
     sys.path.append(str(IMAGE_TO_JSON_DIR))
 if str(JSON_TO_LLM_DIR) not in sys.path:
     sys.path.append(str(JSON_TO_LLM_DIR))
-if str(OCR_DIR) not in sys.path:
-    sys.path.append(str(OCR_DIR))
 
 app.add_middleware(
     CORSMiddleware,
@@ -131,6 +125,16 @@ def _get_label_stats() -> dict:
     return LABEL_STATS_CACHE or {}
 
 
+def _get_ocr_paths() -> tuple[Path, Path]:
+    """그림일기 OCR 전용 경로. /diary-ocr 호출 시에만 사용."""
+    ocr_dir = BASE_DIR / "ocr"
+    ocr_upload = ocr_dir / "uploads"
+    ocr_upload.mkdir(parents=True, exist_ok=True)
+    if str(ocr_dir) not in sys.path:
+        sys.path.insert(0, str(ocr_dir))
+    return ocr_dir, ocr_upload
+
+
 def _run_diary_ocr(file_path: str, area: str) -> dict:
     import diary_ocr_pipeline as diary_ocr
 
@@ -143,8 +147,11 @@ def _run_diary_ocr(file_path: str, area: str) -> dict:
         return_detection_vis=False,
     )
 
-    if len(result) == 5:
-        left_pil, right_pil, _, _, _ = result
+    # preprocess_diary_image(return_detection_vis=False) 기준:
+    # - horizontal: (left_pil, right_pil, final_bgr, det(None), "horizontal", img_path) -> len == 6
+    # - vertical:   (pil_image, final_bgr, "vertical", img_path) -> len == 4
+    if len(result) == 6:
+        left_pil, right_pil, _, _, _, _ = result
         raw_left, text_boxes_left, full_text_left, pil_left_sent = diary_ocr.run_varco_ocr(
             left_pil, max_long_side=512, diary_mode=True
         )
@@ -166,13 +173,14 @@ def _run_diary_ocr(file_path: str, area: str) -> dict:
                 text_boxes.append({"text": item["text"], "bbox": [x1_new, y1, x2_new, y2]})
             else:
                 text_boxes.append(item)
-    elif len(result) == 3:
-        pil_image, _, _ = result
+    elif len(result) == 4:
+        pil_image, _, _, _ = result
         raw_output, text_boxes, full_text, _ = diary_ocr.run_varco_ocr(
             pil_image, max_long_side=512, diary_mode=True
         )
     else:
-        pil_image, _ = result
+        # 레거시/예외 케이스: 앞의 형태로 최대한 흡수
+        pil_image = result[0]
         raw_output, text_boxes, full_text, _ = diary_ocr.run_varco_ocr(
             pil_image, max_long_side=512, diary_mode=True
         )
@@ -185,7 +193,8 @@ def _run_diary_ocr(file_path: str, area: str) -> dict:
     ]
     full_text = "".join(item["text"] for item in text_boxes)
     display_text = diary_ocr.get_diary_text(raw_output, full_text)
-    diary_result = diary_ocr.process_diary_text(display_text, area=area)
+    # diary_ocr_pipeline.process_diary_text는 (text: str)만 받습니다.
+    diary_result = diary_ocr.process_diary_text(display_text)
     diary_ocr.clean_memory()
     return diary_result
 
@@ -280,7 +289,7 @@ async def analyze(
                 encoding="utf-8",
             )
 
-        object_metrics = compute_image_metrics(rag_result, str(input_path), use_color=False)
+        object_metrics = compute_image_metrics(original, str(input_path), use_color=False)
         per_object_metrics.append(object_metrics)
         folder_keys.append(
             {
@@ -349,9 +358,10 @@ async def diary_ocr(file: UploadFile = File(...), area: str = Form("도봉구"))
     if not file.filename:
         raise HTTPException(status_code=400, detail="파일을 업로드해 주세요.")
 
+    _, ocr_upload_dir = _get_ocr_paths()
     ext = Path(file.filename).suffix or ".jpg"
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    input_path = OCR_UPLOAD_DIR / f"diary_{timestamp}{ext}"
+    input_path = ocr_upload_dir / f"diary_{timestamp}{ext}"
     _save_upload_file(file, input_path)
 
     try:
@@ -359,16 +369,18 @@ async def diary_ocr(file: UploadFile = File(...), area: str = Form("도봉구"))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"일기 OCR 실패: {e}")
 
-    if "오류" in diary_result:
-        raise HTTPException(status_code=500, detail=f"일기 분석 실패: {diary_result['오류']}")
+    # Gemini 후처리가 실패해도(= "오류" 포함) OCR 결과는 반환하도록 처리.
+    # 프론트/백엔드에서 원본 텍스트 기반으로 저장/표시를 계속 할 수 있게 함.
 
     response_item = {
         "원본": diary_result.get("원본", ""),
         "날짜": diary_result.get("날짜", ""),
         "지역": area,
-        "날씨": diary_result.get("날씨", ""),
+        # 현재 파이프라인은 날씨를 생성하지 않음 (필요 시 BackEnd에서 보강)
+        "날씨": diary_result.get("날씨", "") if isinstance(diary_result, dict) else "",
         "제목": diary_result.get("제목", ""),
         "교정된_내용": diary_result.get("내용", ""),
+        "오류": diary_result.get("오류", "") if isinstance(diary_result, dict) else "",
     }
     return [response_item]
 
