@@ -17,6 +17,7 @@ from analysis_metrics import (
     compute_peer_summary_by_folder,
     load_peer_stats,
 )
+from drawing_score import compute_scores_for_analysis as compute_drawing_scores
 
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -68,6 +69,13 @@ app.add_middleware(
 class ChatbotRequest(BaseModel):
     question: str
     analysis_context: dict | None = None
+
+
+class AnalyzeScoreRequest(BaseModel):
+    """T-Score 산출용 요청 (이미 분석된 results + 아동 정보)."""
+    results: dict
+    age: int
+    gender: str
 
 
 class ChatbotResponse(BaseModel):
@@ -309,6 +317,9 @@ async def analyze(
                 gender_kr,
                 folder_keys,
             )
+        # T-Score 기반 drawing_norm_dist_stats 비교 점수 (에너지/위치안정성/표현력)
+        drawing_scores = compute_drawing_scores(results, age_int, gender_kr)
+        comparison["drawing_scores"] = drawing_scores
 
     return {
         "success": True,
@@ -320,6 +331,17 @@ async def analyze(
         "results": results,
         "comparison": comparison,
     }
+
+
+@app.post("/analyze/score")
+def analyze_score(payload: AnalyzeScoreRequest):
+    """분석 결과(results)와 아동 정보로 T-Score를 산출합니다."""
+    gender_kr = _normalize_gender(payload.gender)
+    if gender_kr not in {"남", "여"}:
+        raise HTTPException(status_code=400, detail="gender는 남/여 중 하나여야 합니다.")
+    age = max(7, min(13, int(payload.age) or 8))
+    drawing_scores = compute_drawing_scores(payload.results, age, gender_kr)
+    return drawing_scores
 
 
 @app.post("/diary-ocr")
