@@ -12,6 +12,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from chatbot.guideChatbot import get_chatbot_answer
+from analysis_metrics import (
+    compute_image_metrics,
+    compute_peer_summary_by_folder,
+    load_peer_stats,
+)
 
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -34,6 +39,8 @@ JSON_TO_LLM_RESULTS_DIR = JSON_TO_LLM_DIR / "results"
 OCR_DIR = BASE_DIR / "ocr"
 OCR_UPLOAD_DIR = OCR_DIR / "uploads"
 OCR_RESULT_DIR = OCR_DIR / "results"
+LABEL_STATS_PATH = BASE_DIR / "data" / "label_stats_by_group.json"
+LABEL_STATS_CACHE = None
 
 IMAGE_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 IMAGE_RESULT_DIR.mkdir(parents=True, exist_ok=True)
@@ -106,6 +113,13 @@ def _normalize_gender(value: str) -> str:
     if v in {"female", "f", "여", "여아"}:
         return "여"
     return "미상"
+
+
+def _get_label_stats() -> dict:
+    global LABEL_STATS_CACHE
+    if LABEL_STATS_CACHE is None:
+        LABEL_STATS_CACHE = load_peer_stats(LABEL_STATS_PATH)
+    return LABEL_STATS_CACHE or {}
 
 
 def _run_diary_ocr(file_path: str, area: str) -> dict:
@@ -203,6 +217,8 @@ async def analyze(
     ]
 
     results = {}
+    per_object_metrics = []
+    folder_keys = []
     for object_type, label_kr, upload in uploads:
         ext = Path(upload.filename or "").suffix or ".jpg"
         stem = f"{label_kr}_{age_str}_{gender_kr}_{timestamp}"
@@ -255,6 +271,17 @@ async def analyze(
                 encoding="utf-8",
             )
 
+        object_metrics = compute_image_metrics(rag_result, str(input_path), use_color=False)
+        per_object_metrics.append(object_metrics)
+        folder_keys.append(
+            {
+                "tree": "TL_나무",
+                "house": "TL_집",
+                "man": "TL_남자사람",
+                "woman": "TL_여자사람",
+            }.get(object_type, "")
+        )
+
         results[object_type] = {
             "label": label_kr,
             "image_json": rag_result,
@@ -263,7 +290,24 @@ async def analyze(
             "box_image_base64": box_image_base64,
             "json_path": str(output_json_path),
             "interpretation_path": str(interpretation_path),
+            "metrics": object_metrics,
         }
+
+    comparison = {}
+    try:
+        age_int = int(age_str)
+    except ValueError:
+        age_int = 0
+    if age_int and gender_kr in {"남", "여"}:
+        stats = _get_label_stats()
+        if stats:
+            comparison = compute_peer_summary_by_folder(
+                per_object_metrics,
+                stats,
+                age_int,
+                gender_kr,
+                folder_keys,
+            )
 
     return {
         "success": True,
@@ -273,6 +317,7 @@ async def analyze(
             "gender": gender_kr,
         },
         "results": results,
+        "comparison": comparison,
     }
 
 
