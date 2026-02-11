@@ -57,16 +57,17 @@ async def ask_psych_analysis(question: str):
     # with open(json_path, 'r', encoding='utf-8') as f:
     #     analysis_data = json.load(f)
 
-    category = call_lightweight_llm(question)
-    if not category:
+    category_str = call_lightweight_llm(question)
+    if not category_str:
         return "질문의 유형을 알 수 없습니다."
     
-    print(f'질문 카테고리:', category)
+    print(f'질문 카테고리:', category_str)
 
+    category_tuple = tuple(c.strip() for c in category_str.split(','))
+    print(f'카테고리 튜플: {category_tuple}')
 
     # db에서 데이터를 찾아옴(user id를 어디서 받아와야 할지 몰라서 일단 기본값 3으로 줌)
-    analysis_data = await get_psychology_interpretation_by_category(user_id=3, category=category)
-    
+    analysis_data = await get_psychology_interpretation_by_category(user_id=3, category=category_tuple)
     template = """당신은 아동 심리 전문가입니다. 제공된 [분석 dict]을 근거로 부모님의 질문에 답하세요.
     너무 길게 말하지 말고 400 토큰 전후로 대답을 해주세요.
     
@@ -108,3 +109,5 @@ async def main():
 
 
 asyncio.run(main())
+
+# 질문: 우리 아이가 겉으로 보기엔 안정적으로 보이는데, 어째서 추가적인 관찰이 필요하다고 나왔나요?
