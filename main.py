@@ -126,77 +126,52 @@ def _get_label_stats() -> dict:
 
 
 def _get_ocr_paths() -> tuple[Path, Path]:
-    """그림일기 OCR 전용 경로. /diary-ocr 호출 시에만 사용."""
+    """그림일기 OCR 전용 경로. 이미지는 ocr/img, JSON 저장은 ocr."""
     ocr_dir = BASE_DIR / "ocr"
     ocr_upload = ocr_dir / "uploads"
     ocr_upload.mkdir(parents=True, exist_ok=True)
-    if str(ocr_dir) not in sys.path:
-        sys.path.insert(0, str(ocr_dir))
+    (ocr_dir / "img").mkdir(parents=True, exist_ok=True)
     return ocr_dir, ocr_upload
 
 
-def _run_diary_ocr(file_path: str, area: str) -> dict:
-    import diary_ocr_pipeline as diary_ocr
+@app.post("/diary-ocr")
+async def diary_ocr(file: UploadFile = File(...)):
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="파일을 업로드해 주세요.")
 
-    if diary_ocr.model is None or diary_ocr.processor is None:
-        diary_ocr.load_model()
+    ocr_dir, ocr_upload_dir = _get_ocr_paths()
+    ext = Path(file.filename).suffix or ".jpg"
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    base_name = f"diary_{timestamp}"
+    input_path = ocr_upload_dir / f"{base_name}{ext}"
+    _save_upload_file(file, input_path)
 
-    result = diary_ocr.preprocess_diary_image(
-        file_path,
-        show_result=False,
-        return_detection_vis=False,
-    )
+    # diary_ocr_only.run(): 이미지 저장 + 텍스트 추출 + Gemini 후처리 (bbox 제거된 원본)
+    if str(ocr_dir) not in sys.path:
+        sys.path.insert(0, str(ocr_dir))
+    try:
+        import diary_ocr_only
+        response_item = diary_ocr_only.run(str(input_path.resolve()))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"일기 OCR 실패: {e}")
 
-    # preprocess_diary_image(return_detection_vis=False) 기준:
-    # - horizontal: (left_pil, right_pil, final_bgr, det(None), "horizontal", img_path) -> len == 6
-    # - vertical:   (pil_image, final_bgr, "vertical", img_path) -> len == 4
-    if len(result) == 6:
-        left_pil, right_pil, _, _, _, _ = result
-        raw_left, text_boxes_left, full_text_left, pil_left_sent = diary_ocr.run_varco_ocr(
-            left_pil, max_long_side=512, diary_mode=True
-        )
-        raw_right, text_boxes_right, full_text_right, pil_right_sent = diary_ocr.run_varco_ocr(
-            right_pil, max_long_side=512, diary_mode=True
-        )
-        full_text = full_text_left + full_text_right
-        raw_output = (raw_left or "") + "\n" + (raw_right or "")
-        text_boxes = text_boxes_left.copy()
-        w_left = pil_left_sent.size[0]
-        w_right = pil_right_sent.size[0]
-        w_comb = w_left + w_right
-        for item in text_boxes_right:
-            b = item.get("bbox")
-            if b and len(b) >= 4 and max(b) <= 1.0:
-                x1, y1, x2, y2 = b[0], b[1], b[2], b[3]
-                x1_new = (x1 * w_right + w_left) / w_comb
-                x2_new = (x2 * w_right + w_left) / w_comb
-                text_boxes.append({"text": item["text"], "bbox": [x1_new, y1, x2_new, y2]})
-            else:
-                text_boxes.append(item)
-    elif len(result) == 4:
-        pil_image, _, _, _ = result
-        raw_output, text_boxes, full_text, _ = diary_ocr.run_varco_ocr(
-            pil_image, max_long_side=512, diary_mode=True
-        )
-    else:
-        # 레거시/예외 케이스: 앞의 형태로 최대한 흡수
-        pil_image = result[0]
-        raw_output, text_boxes, full_text, _ = diary_ocr.run_varco_ocr(
-            pil_image, max_long_side=512, diary_mode=True
-        )
+    # null → 빈 문자열
+    def _str(v):
+        return v if isinstance(v, str) else (v or "")
 
-    min_bbox_area = 0.0003
-    text_boxes = [
-        item for item in text_boxes
-        if item.get("bbox") and len(item["bbox"]) >= 4
-        and (item["bbox"][2] - item["bbox"][0]) * (item["bbox"][3] - item["bbox"][1]) >= min_bbox_area
-    ]
-    full_text = "".join(item["text"] for item in text_boxes)
-    display_text = diary_ocr.get_diary_text(raw_output, full_text)
-    # diary_ocr_pipeline.process_diary_text는 (text: str)만 받습니다.
-    diary_result = diary_ocr.process_diary_text(display_text)
-    diary_ocr.clean_memory()
-    return diary_result
+    response_item = {k: _str(v) for k, v in response_item.items()}
+
+    json_path = ocr_dir / f"{base_name}_diary_result.json"
+    with open(json_path, "w", encoding="utf-8") as f:
+        json.dump(response_item, f, ensure_ascii=False, indent=2)
+
+    print("\n" + "=" * 60)
+    print("[그림일기 OCR] 분석 결과 (diary_ocr_only)")
+    print("=" * 60)
+    print(json.dumps(response_item, ensure_ascii=False, indent=2))
+    print("=" * 60 + "\n")
+
+    return [{**response_item, "교정된_내용": response_item["내용"]}]
 
 
 @app.post("/analyze")
@@ -351,38 +326,6 @@ def analyze_score(payload: AnalyzeScoreRequest):
     age = max(7, min(13, int(payload.age) or 8))
     drawing_scores = compute_drawing_scores(payload.results, age, gender_kr)
     return drawing_scores
-
-
-@app.post("/diary-ocr")
-async def diary_ocr(file: UploadFile = File(...), area: str = Form("도봉구")):
-    if not file.filename:
-        raise HTTPException(status_code=400, detail="파일을 업로드해 주세요.")
-
-    _, ocr_upload_dir = _get_ocr_paths()
-    ext = Path(file.filename).suffix or ".jpg"
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    input_path = ocr_upload_dir / f"diary_{timestamp}{ext}"
-    _save_upload_file(file, input_path)
-
-    try:
-        diary_result = _run_diary_ocr(str(input_path), area=area)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"일기 OCR 실패: {e}")
-
-    # Gemini 후처리가 실패해도(= "오류" 포함) OCR 결과는 반환하도록 처리.
-    # 프론트/백엔드에서 원본 텍스트 기반으로 저장/표시를 계속 할 수 있게 함.
-
-    response_item = {
-        "원본": diary_result.get("원본", ""),
-        "날짜": diary_result.get("날짜", ""),
-        "지역": area,
-        # 현재 파이프라인은 날씨를 생성하지 않음 (필요 시 BackEnd에서 보강)
-        "날씨": diary_result.get("날씨", "") if isinstance(diary_result, dict) else "",
-        "제목": diary_result.get("제목", ""),
-        "교정된_내용": diary_result.get("내용", ""),
-        "오류": diary_result.get("오류", "") if isinstance(diary_result, dict) else "",
-    }
-    return [response_item]
 
 
 if __name__ == "__main__":
