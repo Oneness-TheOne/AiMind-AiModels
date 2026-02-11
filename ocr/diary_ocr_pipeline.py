@@ -19,11 +19,17 @@ import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image, ImageDraw
 from transformers import AutoProcessor, LlavaOnevisionForConditionalGeneration, BitsAndBytesConfig
-import google.generativeai as genai
+try:
+    from google import genai as genai_client
+except ImportError:
+    genai_client = None
 from dotenv import load_dotenv
 
-# .env 파일에서 GEMINI_API_KEY 등 로드
-load_dotenv()
+# .env 파일에서 GEMINI_API_KEY 등 로드 (main.py에서 호출 시 cwd와 무관하게 프로젝트 루트 .env 사용)
+_this_dir = os.path.dirname(os.path.abspath(__file__))
+_env_path = os.path.join(os.path.dirname(_this_dir), ".env")
+load_dotenv(_env_path)
+load_dotenv()  # cwd 기준 .env도 시도 (스크립트 직접 실행 시)
 
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
@@ -83,7 +89,21 @@ def load_model():
     print("모델 로드 완료.")
 
 
+def _strip_model_special_tokens(text: str) -> str:
+    """모델이 조기 종료 시 넣는 특수 토큰·태그 제거 (서버 등에서 <|im_end|>, </char> 잔여 등)."""
+    if not text:
+        return text
+    s = text
+    s = re.sub(r"<\|im_end\|>", "", s)
+    s = re.sub(r"<\|im_start\|>", "", s)
+    s = re.sub(r"<\|[^|]+\|>", "", s)  # 기타 <|...|> 형태
+    # 조기 종료로 남은 불완전 태그 제거 (원본 텍스트에 </char>, <char> 안 남기기)
+    s = s.replace("</char>", "").replace("<char>", "")
+    return s.strip()
+
+
 def parse_ocr_output(output_text):
+    output_text = _strip_model_special_tokens(output_text or "")
     text_boxes = []
     full_text_parts = []
     pattern = re.compile(r"<char>\s*([^<]*?)\s*</char>\s*<bbox>\s*([^<]*?)\s*</bbox>", re.DOTALL)
@@ -111,8 +131,10 @@ def get_diary_text(raw_output, full_text):
             raw_clean = re.sub(r"<char>.*?</char>", "", raw_output or "", flags=re.DOTALL)
             raw_clean = re.sub(r"<bbox>.*?</bbox>", "", raw_clean, flags=re.DOTALL)
             raw_clean = raw_clean.replace("<ocr>", "").strip()
+            raw_clean = _strip_model_special_tokens(raw_clean)
             return raw_clean if raw_clean else (raw_output or full_text)
-    return full_text or raw_output or ""
+    out = full_text or raw_output or ""
+    return _strip_model_special_tokens(out) if out else ""
 
 
 def run_varco_ocr(pil_image, max_long_side=800, max_new_tokens=1400, diary_mode=False):
@@ -126,9 +148,17 @@ def run_varco_ocr(pil_image, max_long_side=800, max_new_tokens=1400, diary_mode=
     conversation = [{"role": "user", "content": [{"type": "image", "image": pil_image}, {"type": "text", "text": ocr_prompt}]}]
     inputs = processor.apply_chat_template(conversation, add_generation_prompt=True, tokenize=True, return_dict=True, return_tensors="pt").to(model.device)
     with torch.inference_mode():
-        generate_ids = model.generate(**inputs, max_new_tokens=max_new_tokens, do_sample=False, num_beams=1, use_cache=True)
+        generate_ids = model.generate(
+            **inputs,
+            max_new_tokens=max_new_tokens,
+            min_new_tokens=min(400, max_new_tokens // 2),  # EOS 조기 종료 완화: 최소 400토큰 생성
+            do_sample=False,
+            num_beams=1,
+            use_cache=True,
+        )
     generated = generate_ids[0][len(inputs.input_ids[0]):]
     raw_output = processor.decode(generated, skip_special_tokens=False)
+    raw_output = _strip_model_special_tokens(raw_output)
     text_boxes, full_text = parse_ocr_output(raw_output)
     return raw_output, text_boxes, full_text, pil_image_sent
 
@@ -358,6 +388,8 @@ def _extract_diary_info_gemini(text: str) -> dict:
     api_key = os.environ.get("GEMINI_API_KEY", "") or os.environ.get("GOOGLE_API_KEY", "")
     if not api_key or not api_key.strip():
         raise ValueError("GEMINI_API_KEY 또는 GOOGLE_API_KEY 환경변수를 설정해주세요.")
+    if genai_client is None:
+        raise ImportError("google-genai 패키지가 필요합니다. pip install google-genai")
     prompt = (
         "다음은 어린이가 쓴 그림일기 텍스트입니다. 띄어쓰기가 없고 오타가 많습니다.\n\n"
         "다음 JSON 형식으로만 답해주세요. 다른 설명 없이 JSON만 출력하세요.\n\n"
@@ -369,10 +401,12 @@ def _extract_diary_info_gemini(text: str) -> dict:
         "입력 텍스트:\n"
     )
     full_prompt = prompt + text
-    genai.configure(api_key=api_key)
-    gemini_model = genai.GenerativeModel("gemini-2.0-flash")
-    response = gemini_model.generate_content(full_prompt)
-    raw_text = response.text.strip()
+    client = genai_client.Client(api_key=api_key)
+    response = client.models.generate_content(
+        model="gemini-2.0-flash",
+        contents=full_prompt,
+    )
+    raw_text = (response.text if hasattr(response, "text") and response.text else "").strip()
     if "```" in raw_text:
         raw_text = re.sub(r"```(?:json)?\n?", "", raw_text)
         raw_text = raw_text.replace("```", "").strip()
@@ -587,26 +621,27 @@ def run(
 
 
 if __name__ == "__main__":
-    # 설정
-    file_path = "ocr/2page3.jpg"
-    max_long_side = 512
-    show_preprocess = True
-    show_detection = True
-    save_detection_images = False
-    diary_mode = False
+    # CLI: python diary_ocr_pipeline.py <이미지경로> → 서브프로세스/배치용 (diary_mode=True, show_progress=False)
+    if len(sys.argv) >= 2:
+        file_path = sys.argv[1]
+        run(
+            file_path=file_path,
+            max_long_side=512,
+            show_preprocess=False,
+            show_detection=False,
+            save_detection_images=False,
+            diary_mode=True,
+            show_progress=False,
+        )
+    else:
+        file_path = "2page3.jpg"
+        run(
+            file_path=file_path,
+            max_long_side=512,
+            show_preprocess=True,
+            show_detection=True,
+            save_detection_images=False,
+            diary_mode=False,
+            show_progress=True,
+        )
 
-    # 선택: CUDA 환경 확인
-    # check_cuda()
-    
-
-    run(
-        file_path=file_path,
-        max_long_side=max_long_side,
-        show_preprocess=show_preprocess,
-        show_detection=show_detection,
-        save_detection_images=save_detection_images,
-        diary_mode=diary_mode,
-        show_progress=True,  # 진행률 표시 (False면 비활성화)
-    )
-
-    
