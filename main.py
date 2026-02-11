@@ -1,3 +1,4 @@
+import io
 import os
 import json
 import base64
@@ -7,6 +8,7 @@ import markdown
 from pathlib import Path
 from datetime import datetime
 from dotenv import load_dotenv
+from PIL import Image
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -109,6 +111,44 @@ def _encode_image_base64(path: Path) -> str | None:
     return f"data:image/{mime};base64,{encoded}"
 
 
+def _encode_image_base64_resized(path: Path, max_bytes: int = 1_400_000, max_long_side: int = 1200, quality: int = 85) -> str | None:
+    """이미지를 읽어, 크기가 max_bytes 초과면 해상도/품질을 낮춰 JPEG로 압축한 뒤 data URL 반환."""
+    if not path.exists() or not path.is_file():
+        return None
+    raw = path.read_bytes()
+    if len(raw) <= max_bytes:
+        ext = path.suffix.lower().lstrip(".") or "jpg"
+        mime = "jpeg" if ext in {"jpg", "jpeg"} else ext
+        return f"data:image/{mime};base64,{base64.b64encode(raw).decode('utf-8')}"
+    try:
+        img = Image.open(io.BytesIO(raw)).convert("RGB")
+        w, h = img.size
+        if max(w, h) > max_long_side:
+            img.thumbnail((max_long_side, max_long_side), Image.Resampling.LANCZOS)
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=quality, optimize=True)
+        data = buf.getvalue()
+        while len(data) > max_bytes and (max_long_side > 320 or quality > 40):
+            if quality > 40:
+                quality -= 10
+            else:
+                max_long_side = int(max_long_side * 0.75)
+                img = Image.open(io.BytesIO(raw)).convert("RGB")
+                if max(img.size) > max_long_side:
+                    img.thumbnail((max_long_side, max_long_side), Image.Resampling.LANCZOS)
+                quality = 75
+            buf = io.BytesIO()
+            img.save(buf, format="JPEG", quality=quality, optimize=True)
+            data = buf.getvalue()
+        encoded = base64.b64encode(data).decode("utf-8")
+        return f"data:image/jpeg;base64,{encoded}"
+    except Exception as e:
+        print(f"[diary-ocr] 이미지 리사이즈 실패 (원본 사용 시도): {e}")
+        if len(raw) <= 2 * max_bytes:
+            return f"data:image/jpeg;base64,{base64.b64encode(raw).decode('utf-8')}"
+        return None
+
+
 def _normalize_gender(value: str) -> str:
     v = (value or "").strip().lower()
     if v in {"male", "m", "남", "남아"}:
@@ -161,17 +201,45 @@ async def diary_ocr(file: UploadFile = File(...)):
 
     response_item = {k: _str(v) for k, v in response_item.items()}
 
+    # 크롭된 그림(그림_저장경로)을 data URL로 넣어 프론트 카드 사진란에서 사용. 크면 해상도 낮춰서라도 포함.
+    MAX_IMAGE_BYTES_FOR_RESPONSE = 1_400_000  # 약 1.4MB 초과 시 리사이즈 후 포함
+    try:
+        cropped_path = (response_item.get("그림_저장경로") or "").strip()
+        if cropped_path:
+            p = Path(cropped_path)
+            if p.exists() and p.is_file():
+                url = _encode_image_base64_resized(p, max_bytes=MAX_IMAGE_BYTES_FOR_RESPONSE)
+                response_item["image_data_url"] = url
+                if url and len(url) > 500:
+                    print(f"[diary-ocr] 크롭 이미지 포함 (data URL 길이={len(url)})")
+            else:
+                response_item["image_data_url"] = None
+        else:
+            response_item["image_data_url"] = None
+    except Exception as e:
+        print(f"[diary-ocr] 크롭 이미지 data URL 변환 실패 (무시): {e}")
+        response_item["image_data_url"] = None
+
+    payload_for_json = {k: v for k, v in response_item.items() if k != "image_data_url"}
     json_path = ocr_dir / f"{base_name}_diary_result.json"
-    with open(json_path, "w", encoding="utf-8") as f:
-        json.dump(response_item, f, ensure_ascii=False, indent=2)
+    try:
+        with open(json_path, "w", encoding="utf-8") as f:
+            json.dump(payload_for_json, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"[diary-ocr] JSON 저장 실패 (무시): {e}")
 
     print("\n" + "=" * 60)
     print("[그림일기 OCR] 분석 결과 (diary_ocr_only)")
     print("=" * 60)
-    print(json.dumps(response_item, ensure_ascii=False, indent=2))
+    print(json.dumps(payload_for_json, ensure_ascii=False, indent=2))
     print("=" * 60 + "\n")
 
-    return [{**response_item, "교정된_내용": response_item["내용"]}]
+    try:
+        return [{**response_item, "교정된_내용": response_item.get("내용", "") or ""}]
+    except Exception as e:
+        print(f"[diary-ocr] 응답 반환 직전 오류 (이미지 제외 후 재시도): {e}")
+        response_item["image_data_url"] = None
+        return [{**response_item, "교정된_내용": response_item.get("내용", "") or ""}]
 
 
 @app.post("/analyze")
