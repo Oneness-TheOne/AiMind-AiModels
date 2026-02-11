@@ -134,14 +134,16 @@ def run_varco_ocr(pil_image, max_long_side=800, max_new_tokens=1400, diary_mode=
 
 
 def imshow(title, image):
-    plt.figure(figsize=(12, 12))
-    plt.title(title)
-    if len(image.shape) == 3:
-        plt.imshow(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
-    else:
-        plt.imshow(image, cmap="gray")
-    plt.axis("off")
-    plt.show()
+    # 시각화 전용 함수 (현재는 비활성화됨)
+    # plt.figure(figsize=(12, 12))
+    # plt.title(title)
+    # if len(image.shape) == 3:
+    #     plt.imshow(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+    # else:
+    #     plt.imshow(image, cmap="gray")
+    # plt.axis("off")
+    # plt.show()
+    pass
 
 
 def order_points(pts):
@@ -317,9 +319,9 @@ def preprocess_diary_image(file_path, show_result=False, use_color_for_ocr=True,
             final_bgr = cv2.cvtColor(np.hstack([left_clean, right_clean]), cv2.COLOR_GRAY2BGR)
         if return_detection_vis and detection_vis_bgr is not None:
             cv2.putText(detection_vis_bgr, "Horizontal: left(top20%,left55%) -> right OCR", (50, 90), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 165, 255), 2)
-        if show_result:
-            imshow("Left (top20%, left55%)", left_clean)
-            imshow("Right page", right_clean)
+        # if show_result:
+        #     imshow("Left (top20%, left55%)", left_clean)
+        #     imshow("Right page", right_clean)
         det = detection_vis_bgr if return_detection_vis else None
         return left_pil, right_pil, final_bgr, det, "horizontal", img_path
     else:
@@ -328,8 +330,8 @@ def preprocess_diary_image(file_path, show_result=False, use_color_for_ocr=True,
         final_result = adaptive_cleanup(warped)
         final_bgr = cv2.cvtColor(final_result, cv2.COLOR_GRAY2BGR)
         pil_image = Image.fromarray(cv2.cvtColor(final_result, cv2.COLOR_GRAY2RGB))
-        if show_result:
-            imshow("Smart Clean Scan Result", final_result)
+        # if show_result:
+        #     imshow("Smart Clean Scan Result", final_result)
         det = detection_vis_bgr if return_detection_vis else None
         if return_detection_vis and detection_vis_bgr is not None:
             return pil_image, final_bgr, detection_vis_bgr, "vertical", img_path
@@ -473,13 +475,13 @@ def run(
         if img_path:
             print(f"그림 영역 저장: {img_path}")
 
-        if detection_vis_bgr is not None:
-            if show_detection:
-                plt.figure(figsize=(12, 12))
-                plt.title("문서 영역 탐지 결과")
-                plt.imshow(cv2.cvtColor(detection_vis_bgr, cv2.COLOR_BGR2RGB))
-                plt.axis("off")
-                plt.show()
+        # if detection_vis_bgr is not None:
+        #     if show_detection:
+                # plt.figure(figsize=(12, 12))
+                # plt.title("문서 영역 탐지 결과")
+                # plt.imshow(cv2.cvtColor(detection_vis_bgr, cv2.COLOR_BGR2RGB))
+                # plt.axis("off")
+                # plt.show()
             if save_detection_images:
                 out_path = file_path.rsplit(".", 1)[0] + "_detection.jpg"
                 cv2.imwrite(out_path, detection_vis_bgr)
@@ -535,12 +537,12 @@ def run(
                     x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
                 cv2.rectangle(vis, (x1, y1), (x2, y2), (0, 255, 0), 3)
         prog(90, "시각화 생성 중...")
-        print("\n글자 위치 탐지 결과 (바운딩 박스)")
-        plt.figure(figsize=(12, 12))
-        plt.title("OCR Bounding Boxes")
-        plt.imshow(cv2.cvtColor(vis, cv2.COLOR_BGR2RGB))
-        plt.axis("off")
-        plt.show()
+        # print("\n글자 위치 탐지 결과 (바운딩 박스)")
+        # plt.figure(figsize=(12, 12))
+        # plt.title("OCR Bounding Boxes")
+        # plt.imshow(cv2.cvtColor(vis, cv2.COLOR_BGR2RGB))
+        # plt.axis("off")
+        # plt.show()
 
         img_draw = pil_image_sent.copy().convert("RGB")
         draw = ImageDraw.Draw(img_draw)
@@ -556,12 +558,12 @@ def run(
             box = [(int(x1), int(y1)), (int(x2), int(y1)), (int(x2), int(y2)), (int(x1), int(y2))]
             color = (255, 0, 0) if len(item.get("text", "").strip()) > 1 else (0, 255, 0)
             draw.polygon(box, outline=color, width=5)
-        print("\n탐지 확인 (빨강=여러 글자, 초록=한 글자)")
-        plt.figure(figsize=(12, 12))
-        plt.title("Text boxes (PIL polygon)")
-        plt.imshow(img_draw)
-        plt.axis("off")
-        plt.show()
+        # print("\n탐지 확인 (빨강=여러 글자, 초록=한 글자)")
+        # plt.figure(figsize=(12, 12))
+        # plt.title("Text boxes (PIL polygon)")
+        # plt.imshow(img_draw)
+        # plt.axis("off")
+        # plt.show()
 
         # 최종 JSON 형식으로 확인
         print("\n" + "=" * 60)
@@ -586,7 +588,7 @@ def run(
 
 if __name__ == "__main__":
     # 설정
-    file_path = "ocr/2page8.jpg"
+    file_path = "ocr/2page3.jpg"
     max_long_side = 512
     show_preprocess = True
     show_detection = True
