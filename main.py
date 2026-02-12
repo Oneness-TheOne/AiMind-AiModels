@@ -287,6 +287,9 @@ async def analyze(
     gender_kr = _normalize_gender(child_gender)
     age_str = (child_age or "").strip() or "0"
 
+    # 성별을 영문 male/female로 변환 (image_to_json에서 사용)
+    gender_en = "male" if gender_kr == "남" else ("female" if gender_kr == "여" else "male")
+
     uploads = [
         ("tree", "나무", tree),
         ("house", "집", house),
@@ -312,6 +315,7 @@ async def analyze(
                 object_type=object_type,
                 output_format="rag",
                 output_image_path=str(output_image_path),
+                gender=gender_en,
             )
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"{label_kr} 분석 실패: {e}")
