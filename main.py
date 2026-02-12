@@ -63,6 +63,12 @@ app.add_middleware(
 )
 
 
+@app.get("/health")
+def health_check():
+    """Docker health check endpoint"""
+    return {"status": "healthy"}
+
+
 class ChatbotRequest(BaseModel):
     question: str
     analysis_context: dict | None = None
