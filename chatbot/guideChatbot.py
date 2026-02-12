@@ -9,6 +9,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableParallel, RunnablePassthrough, RunnableLambda
 from langchain_core.output_parsers import StrOutputParser
 from langchain_community.document_loaders import TextLoader
+import markdown
 
 # ===== 공통 환경/모델 함수 =====
 def load_common_env():

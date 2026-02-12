@@ -1,8 +1,9 @@
 import os
 import sys
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
+from langchain_core.runnables import RunnableParallel, RunnablePassthrough, RunnableLambda
+import markdown
 try:
     from .guideChatbot import get_common_llm  # 공통 LLM 함수 사용
 except ImportError:
@@ -85,14 +86,13 @@ def get_answer_for_more_question_about_analysis(question: str, analysis_context:
     print('심리 분석 질문 챗봇 작동 시작')
     if analysis_context:
         analysis_text = _build_analysis_context_text(analysis_context)
+        
         if analysis_text.strip():
             prompt = get_analysis_aware_prompt()
             llm = get_common_llm()
-            # context_docs = retrieve_with_keywords(question, retriever)
-            # context_str = "\n\n".join(d.page_content for d in context_docs) if context_docs else "(관련 문서 없음)"
-            chain = prompt | llm | StrOutputParser()
-            return chain.invoke({ # "context": context_str,
+            chain = prompt | llm | StrOutputParser() | RunnableLambda(lambda x: markdown.markdown(x))
+
+    return chain.invoke({ 
                 "analysis_text": analysis_text,
                 "question": question,
             })
-    return chain.invoke(question)
