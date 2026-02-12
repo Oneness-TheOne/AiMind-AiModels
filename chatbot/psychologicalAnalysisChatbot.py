@@ -1,7 +1,5 @@
 import os
-import asyncio
 import sys
-import json
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
@@ -73,6 +71,7 @@ def get_analysis_aware_prompt():
   → 그림 검사(HTP)는 특정 시점의 표현이므로, 실제 일상에서의 모습과 다를 수 있음을 설명해 주세요.
   → 그림에서 낮게 나온 지표라도 일상에서는 잘 나타날 수 있는 이유(그림 그릴 때의 상태, 환경, 그림 표현의 한계 등)를 설명해 주세요.
 - 분석 결과의 의미를 쉽게 풀어 설명하고, 궁금한 점에 대해 친절히 답변합니다.
+- 너무 장황하게 대답하지 말고 400토큰 전후로 핵심만 대답해 주세요.
 - 답변은 **공손한 반말/존중어**(~하시면 됩니다, ~해 주세요)로 작성합니다.
 - 전문 상담을 대체하지 않으며, 참고용임을 안내합니다.
 
@@ -83,6 +82,7 @@ def get_analysis_aware_prompt():
 
 
 def get_answer_for_more_question_about_analysis(question: str, analysis_context: dict | None = None) -> str:
+    print('심리 분석 질문 챗봇 작동 시작')
     if analysis_context:
         analysis_text = _build_analysis_context_text(analysis_context)
         if analysis_text.strip():
@@ -96,22 +96,3 @@ def get_answer_for_more_question_about_analysis(question: str, analysis_context:
                 "question": question,
             })
     return chain.invoke(question)
-
-
-# 어떤 요소에 관한 질문인지 llm한테 category를 응답받는 함수
-def call_lightweight_llm(question):
-    
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", """질문을 분석해서 [tree, house, man, woman, all] 중 
-         어느 것에 해당되는지 단어만 응답하세요.
-         전체가 아니라면 해당되는 항목을 모두 응답하세요."""),
-        ("user", "{input}")
-    ])
-    
-    # 체인 구성 (Prompt -> LLM -> OutputParser)
-    chain = prompt | get_common_llm() | StrOutputParser()
-    
-    return chain.invoke({"input": question}).strip().lower()
-
-
-# 질문: 우리 아이가 겉으로 보기엔 안정적으로 보이는데, 어째서 추가적인 관찰이 필요하다고 나왔나요?

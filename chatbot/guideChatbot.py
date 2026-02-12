@@ -1,6 +1,5 @@
 import os
 import re
-import json
 from dotenv import load_dotenv
 from langchain_text_splitters import RecursiveCharacterTextSplitter, MarkdownHeaderTextSplitter
 from langchain_chroma import Chroma
@@ -139,6 +138,7 @@ def get_guide_prompt():
 
 
 def ask_to_website_guide_chatbot(question):
+    print('가이드 챗봇 작동 시작')
     # RAG Chain
     prompt = get_guide_prompt()
     llm = get_common_llm()
@@ -146,8 +146,12 @@ def ask_to_website_guide_chatbot(question):
     """
     사용자 질문 → 키워드 추출 → 해당 키워드로 RAG 검색 실행.
     """
+    embeddings = get_common_embeddings()
+
     search_query = extract_search_query(question)
-    vectorstore = get_vectorstore()
+    splits = split_markdown_docs(load_guide_docs())
+
+    vectorstore = get_vectorstore(splits, embeddings)
 
     retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
 
@@ -156,7 +160,10 @@ def ask_to_website_guide_chatbot(question):
     rag_chain = (
         # RunnablePassthrough(): 사용자의 질문을 가공 없이 그대로 전달
         # { "context": [찾은 문서들], "question": "사용자의 질문" }
-        RunnableParallel({"context": context, "question": RunnablePassthrough()})
+
+        # retriever는 관련 문서를 찾아 리스트로 반환합니다.
+        RunnableParallel({"context": RunnablePassthrough() | retriever, 
+                          "question": RunnablePassthrough()})
         | prompt
         | llm
         # 복잡한 llm 응답 데이터에서 사용자가 읽을 답변 텍스트만 추출, 출력해주는 parser

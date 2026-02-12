@@ -86,6 +86,7 @@ def chatbot(payload: ChatbotRequest):
     if not question:
         raise HTTPException(status_code=400, detail="질문을 입력해 주세요.")
     
+    print(question)
     analysis_context = payload.analysis_context
     answer = ""
 
@@ -105,6 +106,7 @@ def chatbot(payload: ChatbotRequest):
             raise HTTPException(status_code=500, detail="답변을 준비할 수 없습니다.")
         
     except Exception as e:
+        print(e)
         raise HTTPException(status_code=500, detail="답변을 준비하는 과정에서 오류가 발생했습니다.")
     
     return ChatbotResponse(question=question, answer=answer)
