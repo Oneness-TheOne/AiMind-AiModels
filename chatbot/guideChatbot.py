@@ -6,7 +6,7 @@ from langchain_chroma import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.runnables import RunnableParallel, RunnablePassthrough
+from langchain_core.runnables import RunnableParallel, RunnablePassthrough, RunnableLambda
 from langchain_core.output_parsers import StrOutputParser
 from langchain_community.document_loaders import TextLoader
 
@@ -57,10 +57,6 @@ def split_markdown_docs(docs):
         chunk_overlap=100
     )
     splits = text_splitter.split_documents(header_splits)
-    # chunking 결과 확인
-    # print(f"총 청크 개수: {len(splits)}")
-    # print(f"첫 번째 청크 메타데이터: {splits[1].metadata}")
-    # print(f"첫 번째 청크 내용:\n{splits[1].page_content}")
     return splits
 
 
@@ -92,6 +88,7 @@ def extract_search_query(question: str) -> str:
     """
     # 한글/영문/숫자 토큰만 추출
     tokens = re.findall(r"[가-힣A-Za-z0-9]+", question)
+    
     # 기초적인 불용어(조사/접속어 등) 제거
     stopwords = {
         "는", "은", "이", "가", "을", "를", "에", "에서", "으로", "로",
@@ -99,10 +96,13 @@ def extract_search_query(question: str) -> str:
         "혹시", "정말", "진짜", "좀", "조금", "너무", "어떻게", "왜",
         "거", "요",
     }
+    
     keywords = [t for t in tokens if t not in stopwords and len(t) > 1]
+    
     # 도메인 관련 보조 키워드(이미지/OCR 관련 질문일 때)
     if any(k in question for k in ["OCR", "ocr", "이미지", "사진", "인식", "그림일기"]):
         keywords.extend(["OCR", "이미지", "사진", "인식", "그림일기"])
+    
     # 키워드가 하나도 안 남으면 원문을 그대로 사용
     if not keywords:
         return question
@@ -148,31 +148,29 @@ def ask_to_website_guide_chatbot(question):
     """
     embeddings = get_common_embeddings()
 
-    search_query = extract_search_query(question)
+    # 문서 분할
     splits = split_markdown_docs(load_guide_docs())
 
     vectorstore = get_vectorstore(splits, embeddings)
 
     retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
 
-    context = retriever.invoke(search_query)
-    
     rag_chain = (
         # RunnablePassthrough(): 사용자의 질문을 가공 없이 그대로 전달
         # { "context": [찾은 문서들], "question": "사용자의 질문" }
 
         # retriever는 관련 문서를 찾아 리스트로 반환합니다.
-        RunnableParallel({"context": RunnablePassthrough() | retriever, 
-                          "question": RunnablePassthrough()})
+        RunnableParallel({
+
+            # context: 키워드 추출 함수를 거친 뒤 retriever로 전달
+            "context": RunnableLambda(extract_search_query) | retriever, 
+                          
+            #  question: 가공되지 않은 원본 질문 그대로 prompt 전달
+            "question": RunnablePassthrough()
+        })
         | prompt
         | llm
         # 복잡한 llm 응답 데이터에서 사용자가 읽을 답변 텍스트만 추출, 출력해주는 parser
         | StrOutputParser()
     )
     return rag_chain.invoke(question)
-
-
-
-
-# 웹 사이트 질문: 그림 인식을 더 잘 시키려면 어떻게 해야 하나요?
-# 심리 검사 질문: 나무를 너무 작게 그렸는데 어떤 의미가 있나요?
