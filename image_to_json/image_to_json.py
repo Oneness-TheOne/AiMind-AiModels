@@ -27,6 +27,7 @@ CONF_DEFAULT = 0.15
 IOU_DEFAULT = 0.45
 IMGSZ = 768
 
+MASK_THRESHOLD_DEFAULT: 0.65
 # 영문 클래스명 -> 한글 (RAG 해석용). 객체별로 동일 키 사용.
 CLASS_EN_TO_KR = {
     "tree": {
