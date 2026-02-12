@@ -60,12 +60,10 @@ OUTPUT_IMAGE = "test_man_box.jpg"  # 박스 표시 이미지 저장 경로. 비�
 OUTPUT_DIR = r"C:\Honey\Projects\mid-term\AiMind-AiModels\image_to_json\result"  # 배치 출력 폴더 (디렉터리 입력시)
 # -------------------------------------------------------------------------------------------
 
-CUSTOM_WEIGHTS = {
-    "tree": Path(r"C:\Honey\Projects\mid-term\AiMind-AiModels\image_to_json\tree_weights\best.pt"),
-    "man": Path(r"C:\Honey\Projects\mid-term\AiMind-AiModels\image_to_json\man_weights\best.pt"),
-    "woman": Path(r"C:\Honey\Projects\mid-term\AiMind-AiModels\image_to_json\woman_weights\best.pt"),
-    "house": Path(r"C:\Honey\Projects\mid-term\AiMind-AiModels\image_to_json\house_weights\weights\best.pt"),
-}
+def get_weights_path(object_type: str, gender: str = "male") -> Path:
+    """성별에 따라 가중치 경로를 반환. gender: 'male' | 'female'"""
+    weights_dir = Path(__file__).parent / f"{object_type}_weights" / gender / "best.pt"
+    return weights_dir
 
 FILENAME_PREFIX_TO_OBJECT = {
     "나무": "tree",
@@ -208,10 +206,99 @@ def build_rag_output(r, path: Path, object_type: str, weights: Path, w: int, h: 
     }
 
 
-def _save_annotated_image(r, output_image: Path) -> None:
+def _save_annotated_image(r, output_image: Path, object_type: str = "tree") -> None:
+    """커스텀 annotate: 박스 + 단색 마스크 + 한글 클래스명 (확률 제외)"""
     output_image.parent.mkdir(parents=True, exist_ok=True)
-    plotted = r.plot()
-    cv2.imwrite(str(output_image), plotted)
+
+    # 원본 이미지 가져오기
+    img = r.orig_img.copy()
+    names = r.names or {}
+    en_to_kr = CLASS_EN_TO_KR.get(object_type, {})
+
+    # 색상 팔레트 (BGR)
+    colors = [
+        (255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), (255, 0, 255),
+        (0, 255, 255), (128, 0, 128), (255, 165, 0), (0, 128, 128), (128, 128, 0)
+    ]
+
+    if r.boxes is None or len(r.boxes) == 0:
+        cv2.imwrite(str(output_image), img)
+        return
+
+    boxes = r.boxes
+    xyxy = boxes.xyxy.cpu().numpy() if hasattr(boxes.xyxy, "cpu") else boxes.xyxy.numpy()
+    clss = boxes.cls.cpu().numpy() if hasattr(boxes.cls, "cpu") else boxes.cls.numpy()
+
+    # 마스크가 있으면 단색으로 채우기
+    if r.masks is not None and r.masks.data is not None:
+        mask_data = r.masks.data.cpu().numpy() if hasattr(r.masks.data, "cpu") else np.asarray(r.masks.data)
+
+        for i in range(len(clss)):
+            if i >= len(mask_data):
+                continue
+
+            cid = int(clss[i])
+            color = colors[cid % len(colors)]
+
+            # 마스크를 이미지에 단색으로 오버레이
+            mask = mask_data[i]
+            if mask.ndim == 3:
+                mask = mask.squeeze()
+
+            # 마스크 리사이즈 (원본 이미지 크기에 맞춤)
+            if mask.shape != img.shape[:2]:
+                mask = cv2.resize(mask, (img.shape[1], img.shape[0]))
+
+            # 마스크 영역을 단색으로 오버레이 (투명도 0.4)
+            mask_bool = mask > 0.5
+            overlay = img.copy()
+            overlay[mask_bool] = color
+            cv2.addWeighted(overlay, 0.4, img, 0.6, 0, img)
+
+    # 박스 그리기 + 한글 클래스명 표시
+    for i in range(len(clss)):
+        cid = int(clss[i])
+        en_name = names.get(cid, f"class_{cid}")
+        kr_name = en_to_kr.get(en_name, en_name)
+
+        x1, y1, x2, y2 = xyxy[i].astype(int)
+        color = colors[cid % len(colors)]
+
+        # 박스 그리기 (두께 2)
+        cv2.rectangle(img, (x1, y1), (x2, y2), color, 2)
+
+        # 한글 라벨 배경
+        label = kr_name
+        font_scale = 0.6
+        thickness = 2
+        (w, h), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, font_scale, thickness)
+
+        # 라벨 배경 사각형
+        cv2.rectangle(img, (x1, y1 - h - 10), (x1 + w + 10, y1), color, -1)
+
+        # 한글 텍스트 (PIL 사용)
+        from PIL import Image, ImageDraw, ImageFont
+        img_pil = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+        draw = ImageDraw.Draw(img_pil)
+
+        # 기본 폰트 사용 (한글 지원)
+        try:
+            # Windows: 맑은 고딕
+            font = ImageFont.truetype("malgun.ttf", 16)
+        except:
+            try:
+                # Mac/Linux: 나눔고딕
+                font = ImageFont.truetype("/usr/share/fonts/truetype/nanum/NanumGothic.ttf", 16)
+            except:
+                # 기본 폰트
+                font = ImageFont.load_default()
+
+        draw.text((x1 + 5, y1 - h - 5), label, font=font, fill=(255, 255, 255))
+
+        # PIL -> OpenCV
+        img = cv2.cvtColor(np.array(img_pil), cv2.COLOR_RGB2BGR)
+
+    cv2.imwrite(str(output_image), img)
 
 
 def run(
@@ -221,16 +308,16 @@ def run(
     iou: float = IOU_DEFAULT,
     output_format: str = "raw",
     output_image_path: str | None = None,
+    gender: str = "male",
 ) -> dict:
-    """이미지 1장 추론 후 JSON용 dict 반환. output_format: raw | rag."""
+    """이미지 1장 추론 후 JSON용 dict 반환. output_format: raw | rag. gender: 'male' | 'female'"""
     run_name = CONFIG_MAP[object_type]
-    custom_weights = CUSTOM_WEIGHTS.get(object_type)
-    if custom_weights is not None and custom_weights.exists():
-        weights = custom_weights
-    else:
+    weights = get_weights_path(object_type, gender)
+    if not weights.exists():
+        # 성별 폴더가 없으면 기존 방식으로 폴백
         weights = find_weights(run_name)
     if not weights.exists():
-        raise FileNotFoundError(f"모델 없음: {weights}. 먼저 학습: python src/02_train_yolo_seg_htp.py --object {object_type}")
+        raise FileNotFoundError(f"모델 없음: {weights}. 가중치 파일을 {object_type}_weights/{gender}/best.pt 경로에 넣어주세요.")
 
     path = Path(image_path)
     if not path.is_absolute():
@@ -277,7 +364,7 @@ def run(
         out_img = Path(output_image_path)
         if not out_img.is_absolute():
             out_img = (ROOT / out_img).resolve()
-        _save_annotated_image(r, out_img)
+        _save_annotated_image(r, out_img, object_type)
 
     if output_format == "rag":
         return build_rag_output(r, path, object_type, weights, w, h)
@@ -340,7 +427,7 @@ def _detect_object_type_from_filename(filename: str) -> str | None:
     return None
 
 
-def run_batch_dir(input_dir: Path, output_dir: Path, conf: float, iou: float, output_format: str) -> None:
+def run_batch_dir(input_dir: Path, output_dir: Path, conf: float, iou: float, output_format: str, gender: str = "male") -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     image_files = [
         p for p in sorted(input_dir.iterdir())
@@ -365,6 +452,7 @@ def run_batch_dir(input_dir: Path, output_dir: Path, conf: float, iou: float, ou
                 iou=iou,
                 output_format=output_format,
                 output_image_path=str(out_img),
+                gender=gender,
             )
         except FileNotFoundError as e:
             print(str(e), file=sys.stderr)
@@ -379,6 +467,7 @@ def main():
     parser = argparse.ArgumentParser(description="이미지 1장 → 학습 모델 감지·분류 → JSON (경로는 파일 상단 IMAGE_PATH 등으로도 설정 가능)")
     parser.add_argument("--image", "-i", default=None, help="입력 이미지 경로 (없으면 위 IMAGE_PATH 사용)")
     parser.add_argument("--object", "-o", choices=["tree", "house", "woman", "man"], default=None, help="모델 (없으면 위 OBJECT 사용)")
+    parser.add_argument("--gender", "-g", choices=["male", "female"], default="male", help="성별: male(남아) 또는 female(여아) [기본: male]")
     parser.add_argument("--format", "-f", choices=["raw", "rag"], default="rag", help="raw=원시 bbox/segment, rag=RAG용 세분화 [기본: rag]")
     parser.add_argument("--conf", type=float, default=CONF_DEFAULT, help=f"신뢰도 임계값 (기본 {CONF_DEFAULT})")
     parser.add_argument("--iou", type=float, default=IOU_DEFAULT, help=f"NMS IoU (기본 {IOU_DEFAULT})")
@@ -404,7 +493,7 @@ def main():
         out_dir = Path(output_dir) if output_dir else (path_obj / "result")
         if not out_dir.is_absolute():
             out_dir = (ROOT / out_dir).resolve()
-        run_batch_dir(path_obj, out_dir, conf=args.conf, iou=args.iou, output_format=args.format)
+        run_batch_dir(path_obj, out_dir, conf=args.conf, iou=args.iou, output_format=args.format, gender=args.gender)
         return
 
     object_type = (object_type or "tree").strip() if isinstance(object_type, str) else "tree"
@@ -420,6 +509,7 @@ def main():
             iou=args.iou,
             output_format=args.format,
             output_image_path=output_image_path,
+            gender=args.gender,
         )
     except FileNotFoundError as e:
         print(str(e), file=sys.stderr)
