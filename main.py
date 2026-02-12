@@ -13,7 +13,8 @@ from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from chatbot.guideChatbot import get_chatbot_answer
+from chatbot.guideChatbot import ask_to_website_guide_chatbot
+from chatbot.psychologicalAnalysisChatbot import get_answer_for_more_question_about_analysis
 from analysis_metrics import (
     compute_image_metrics,
     compute_peer_summary_by_folder,
@@ -84,13 +85,27 @@ def chatbot(payload: ChatbotRequest):
     question = payload.question.strip()
     if not question:
         raise HTTPException(status_code=400, detail="질문을 입력해 주세요.")
-    answer = get_chatbot_answer(question, analysis_context=payload.analysis_context)
-
-    if not answer:
-        raise HTTPException(status_code=500, detail="답변을 준비할 수 없습니다.")
     
-    # answer는 markdown 형식이기 때문에 HTML로 바꿔서 반환합니다.
-    answer = markdown.markdown(answer, extensions=["nl2br"])
+    analysis_context = payload.analysis_context
+    answer = ""
+
+    try:
+        # 심리 분석 질문 라우팅
+        if analysis_context: # 분석 결과가 payload에 같이 왔을 때
+            answer = get_answer_for_more_question_about_analysis(question, analysis_context)
+
+        # 웹 사이트 이용 방법 질문 라우팅
+        else:
+            answer = ask_to_website_guide_chatbot(question)
+
+            # guide answer은 markdown 형식이기 때문에 HTML로 바꿔서 반환합니다.
+            answer = markdown.markdown(answer, extensions=["nl2br"])
+
+        if not answer:
+            raise HTTPException(status_code=500, detail="답변을 준비할 수 없습니다.")
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="답변을 준비하는 과정에서 오류가 발생했습니다.")
     
     return ChatbotResponse(question=question, answer=answer)
 

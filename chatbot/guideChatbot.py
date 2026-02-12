@@ -22,6 +22,7 @@ def load_common_env():
 def get_common_llm(temperature=0.2):
     """LLM 모델 생성 공통 함수"""
     load_common_env()
+
     return ChatGoogleGenerativeAI(
         model="models/gemini-flash-latest",
         temperature=temperature
@@ -38,8 +39,6 @@ def load_guide_docs():
     md_file_path = os.path.join(current_dir, "guides", "member_website_guide.md")
     loader = TextLoader(md_file_path, encoding='utf-8')
     docs = loader.load()
-    # 처음 100자까지만 출력해보기
-    # print(docs[0].page_content[:100])
     return docs
 
 
@@ -71,7 +70,6 @@ def get_vectorstore(splits, embeddings):
     collection_name = "guied"
     persist_dir = "./chroma_db"
     if os.path.exists(persist_dir):
-        # print('이미 DB 존재함')
         vectorstore = Chroma(
             persist_directory=persist_dir,
             embedding_function=embeddings,
@@ -86,9 +84,6 @@ def get_vectorstore(splits, embeddings):
         )
     return vectorstore
 
-
-def get_retriever(vectorstore):
-    return vectorstore.as_retriever(search_kwargs={"k": 5})
 
 
 def extract_search_query(question: str) -> str:
@@ -114,14 +109,6 @@ def extract_search_query(question: str) -> str:
         return question
     # 키워드들을 공백으로 이어서 검색용 쿼리로 사용 (중복 제거)
     return " ".join(dict.fromkeys(keywords))
-
-
-def retrieve_with_keywords(question: str, retriever):
-    """
-    사용자 질문 → 키워드 추출 → 해당 키워드로 RAG 검색 실행.
-    """
-    search_query = extract_search_query(question)
-    return retriever.invoke(search_query)
 
 
 def get_guide_prompt():
@@ -151,183 +138,34 @@ def get_guide_prompt():
     return ChatPromptTemplate.from_template(template)
 
 
-def get_rag_chain(retriever):
+def ask_to_website_guide_chatbot(question):
     # RAG Chain
     prompt = get_guide_prompt()
     llm = get_common_llm()
-    def retrieve_with_keywords_inner(question):
-        return retrieve_with_keywords(question, retriever)
+
+    """
+    사용자 질문 → 키워드 추출 → 해당 키워드로 RAG 검색 실행.
+    """
+    search_query = extract_search_query(question)
+    vectorstore = get_vectorstore()
+
+    retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
+
+    context = retriever.invoke(search_query)
+    
     rag_chain = (
         # RunnablePassthrough(): 사용자의 질문을 가공 없이 그대로 전달
         # { "context": [찾은 문서들], "question": "사용자의 질문" }
-        RunnableParallel({"context": retrieve_with_keywords_inner, "question": RunnablePassthrough()})
+        RunnableParallel({"context": context, "question": RunnablePassthrough()})
         | prompt
         | llm
         # 복잡한 llm 응답 데이터에서 사용자가 읽을 답변 텍스트만 추출, 출력해주는 parser
         | StrOutputParser()
     )
-    return rag_chain
-
-
-def get_chatbot_components():
-    # 모든 주요 객체를 한 번에 준비
-    load_common_env()
-    docs = load_guide_docs()
-    splits = split_markdown_docs(docs)
-    embeddings = get_common_embeddings()
-    vectorstore = get_vectorstore(splits, embeddings)
-    retriever = get_retriever(vectorstore)
-    rag_chain = get_rag_chain(retriever)
-    return retriever, rag_chain
-
-
-def _build_analysis_context_text(analysis_context: dict) -> str:
-    """그림 분석 결과를 LLM이 참고할 수 있는 텍스트로 요약합니다."""
-    if not analysis_context:
-        return ""
-    parts = []
-    # 기본 정보
-    if analysis_context.get("childName"):
-        parts.append(f"분석 대상: {analysis_context['childName']}")
-    if analysis_context.get("age"):
-        parts.append(f"나이: {analysis_context['age']}세")
-    if analysis_context.get("overallScore") is not None:
-        parts.append(f"종합 점수: {analysis_context['overallScore']}점")
-    if analysis_context.get("summary"):
-        parts.append(f"\n[전체 해석 요약]\n{analysis_context['summary']}")
-    if analysis_context.get("developmentStage"):
-        parts.append(f"\n발달 단계: {analysis_context['developmentStage']}")
-    if analysis_context.get("emotionalState"):
-        parts.append(f"정서 상태: {analysis_context['emotionalState']}")
-    # 심리 점수
-    psych = analysis_context.get("psychologyScores") or analysis_context.get("psychology_scores")
-    if psych and isinstance(psych, dict):
-        psych_str = ", ".join(f"{k}: {v}점" for k, v in psych.items())
-        parts.append(f"\n[심리 지표 점수]\n{psych_str}")
-    # 나무/집/남자/여자별 해석
-    interp = analysis_context.get("interpretations") or analysis_context.get("interpretation")
-    if interp and isinstance(interp, dict):
-        labels = {"tree": "나무", "house": "집", "man": "남자사람", "woman": "여자사람"}
-        for key, val in interp.items():
-            if not val or not isinstance(val, dict):
-                continue
-            label = labels.get(key, key)
-            interp_obj = val.get("interpretation") if isinstance(val.get("interpretation"), dict) else {}
-            summary = interp_obj.get("전체_요약")
-            if isinstance(summary, dict) and "내용" in summary:
-                summary = summary["내용"]
-            if summary and isinstance(summary, str):
-                parts.append(f"\n[{label} 해석]\n{summary}")
-    return "\n".join(parts) if parts else ""
-
-
-def get_analysis_aware_prompt():
-    """그림 분석 결과를 포함한 상담용 프롬프트"""
-    template = """당신은 '아이마음' 웹사이트의 **아동 그림 심리 분석 상담 도우미**입니다.
-
-아래에 **이 사용자 아이의 그림 분석 결과**가 제공되어 있습니다. 사용자는 이 결과를 바탕으로 추가 질문을 하고 있습니다.
-
-[그림 분석 결과]
-{analysis_text}
-
-[문서 탐색 결과 - 웹사이트/심리 관련 참고 자료]
-{context}
-
-[역할]
-- 그림 분석 결과를 바탕으로 사용자의 질문에 답합니다.
-- "결과에서는 X라고 나왔는데, 제가 보기엔 아이가 Y인데요?"처럼 **분석 결과와 실제 관찰이 다를 때**의 질문에 특히 유의해 주세요.
-  → 그림 검사(HTP)는 특정 시점의 표현이므로, 실제 일상에서의 모습과 다를 수 있음을 설명해 주세요.
-  → 그림에서 낮게 나온 지표라도 일상에서는 잘 나타날 수 있는 이유(그림 그릴 때의 상태, 환경, 그림 표현의 한계 등)를 설명해 주세요.
-- 분석 결과의 의미를 쉽게 풀어 설명하고, 궁금한 점에 대해 친절히 답변합니다.
-- 답변은 **공손한 반말/존중어**(~하시면 됩니다, ~해 주세요)로 작성합니다.
-- 전문 상담을 대체하지 않으며, 참고용임을 안내합니다.
-
-[사용자 질문]
-{question}
-"""
-    return ChatPromptTemplate.from_template(template)
-
-
-def get_chatbot_answer(question: str, analysis_context: dict | None = None) -> str:
-    retriever, rag_chain = get_chatbot_components()
-    if analysis_context:
-        analysis_text = _build_analysis_context_text(analysis_context)
-        if analysis_text.strip():
-            prompt = get_analysis_aware_prompt()
-            llm = get_common_llm()
-            context_docs = retrieve_with_keywords(question, retriever)
-            context_str = "\n\n".join(d.page_content for d in context_docs) if context_docs else "(관련 문서 없음)"
-            chain = prompt | llm | StrOutputParser()
-            return chain.invoke({
-                "analysis_text": analysis_text,
-                "context": context_str,
-                "question": question,
-            })
     return rag_chain.invoke(question)
 
 
-def _print_search_results(question: str) -> None:
-    retriever, _ = get_chatbot_components()
-    search_results = retrieve_with_keywords(question, retriever)
-    print(f"\n🔍 '{question}'에 대해 찾은 문서 개수: {len(search_results)}개\n")
-    for i, doc in enumerate(search_results):
-        print(f"--- [검색 결과 {i+1}] ---")
-        print(f"내용 요약: {doc.page_content[:200]}...")  # 너무 길면 앞부분만 출력
-        print(f"메타데이터: {doc.metadata}")
-        print("\n")
 
-
-# 웹사이트 이용 가이드 챗봇 (Website Guide)
-def load_website_guide_docs():
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    md_path = os.path.join(current_dir, "guides", "member_website_guide.md")
-    return TextLoader(md_path, encoding='utf-8').load()
-
-
-def get_website_vectorstore():
-    persist_dir = "./chroma_db_guide"
-    embeddings = get_common_embeddings()
-    # 이미 생성된 DB가 있다고 가정하고 로드 (없으면 from_documents 로직 추가 필요)
-    return Chroma(persist_directory=persist_dir, embedding_function=embeddings, collection_name="website_guide")
-
-
-def ask_website_guide(question: str):
-    """가이드 챗봇 호출 인터페이스"""
-    vectorstore = get_website_vectorstore()
-    retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
-    
-    template = """당신은 웹사이트 안내원입니다. [문서]를 바탕으로 답하세요.
-    [문서]: {context}
-    [질문]: {question}"""
-    
-    prompt = ChatPromptTemplate.from_template(template)
-    chain = (
-        {"context": retriever, "question": RunnablePassthrough()}
-        | prompt | get_common_llm() | StrOutputParser()
-    )
-    return chain.invoke(question)
-
-
-if __name__ == "__main__":
-    print("웹 사이트 이용 방법에 대해 질문해 보세요! (종료: 'exit' 또는 'quit' 또는 '종료')")
-    while True:
-        question = input("질문: ").strip()
-        if not question:
-            print("질문을 입력해 주세요. (종료: 'exit' 또는 'quit' 또는 '종료')")
-            continue
-        if question.lower() in {"exit", "quit"} or question == "종료":
-            print("대화를 종료합니다.")
-            break
-        _print_search_results(question)
-        answer = get_chatbot_answer(question)
-        print('답변:', answer)
-    question = input('분석 결과에 대한 질문을 입력해 주세요! ')
-
-    if question:
-        # response = ask_psych_analysis(question, 8, "여")
-        print('심리 분석 챗봇 기능은 psychologicalAnalysisChatbot.py에서 사용하세요.')
-    else: 
-        print('답변 실패, 질문을 입력해 주세요.')
 
 # 웹 사이트 질문: 그림 인식을 더 잘 시키려면 어떻게 해야 하나요?
 # 심리 검사 질문: 나무를 너무 작게 그렸는데 어떤 의미가 있나요?
