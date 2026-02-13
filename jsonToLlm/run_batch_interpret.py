@@ -34,21 +34,21 @@ def main():
     parser.add_argument("-o", "--output", default="results", help="결과 저장 디렉터리 (기본: results)")
     parser.add_argument("--no-rag", action="store_true", help="RAG(ChromaDB) 미사용")
     parser.add_argument("--inputs", nargs="+", default=None, help="입력 JSON 경로 (기본: 나무/남자/여자/집 4개)")
-    parser.add_argument("--api-key", default=None, help="Gemini API 키 (미지정 시 GEMINI_API_KEY)")
+    parser.add_argument("--api-key", default=None, help="Gemini API 키 (미지정 시 GEMINI_API_KEYS/GEMINI_API_KEY)")
     args = parser.parse_args()
 
     from dotenv import load_dotenv
     load_dotenv()
-    api_key = args.api_key or os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        print("✗ GEMINI_API_KEY가 필요합니다.")
-        sys.exit(1)
-
     try:
-        from gemini_integration import analyze_and_interpret
+        from gemini_integration import analyze_and_interpret, resolve_gemini_api_key
     except ImportError as e:
         print("✗ gemini_integration을 불러올 수 없습니다. pip install -r requirements.txt")
         print(f"  상세: {e}")
+        sys.exit(1)
+
+    api_key = args.api_key  # None이면 env에서 키 순환(503 시 다음 키)
+    if not resolve_gemini_api_key(api_key):
+        print("✗ GEMINI_API_KEY 또는 GEMINI_API_KEYS가 필요합니다.")
         sys.exit(1)
 
     try:
@@ -79,8 +79,8 @@ def main():
             temperature=0.2,
             use_rag=not args.no_rag,
             rag_db_path=None,
-            rag_k=10,
-            max_output_tokens=8192,
+            rag_k=5,
+            max_output_tokens=4096,
         )
         elapsed = time.perf_counter() - t0
         if not results.get("success"):

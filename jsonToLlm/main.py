@@ -28,7 +28,8 @@ def cmd_ingest(args: argparse.Namespace) -> None:
     result_dir = getattr(args, "result_dir", "results")  # ingest 출력: htp_final_dataset*.json 저장 위치
     db_path = getattr(args, "db_path", "htp_knowledge_base")
     json_path = getattr(args, "json", None)
-    api_key = getattr(args, "api_key", None) or os.getenv("GEMINI_API_KEY")
+    from gemini_integration import resolve_gemini_api_key
+    api_key = getattr(args, "api_key", None) or resolve_gemini_api_key()
 
     if json_path:
         # 이미 있는 JSON만 ChromaDB에 적재
@@ -41,7 +42,7 @@ def cmd_ingest(args: argparse.Namespace) -> None:
 
     # PDF → JSON → ChromaDB 전체 파이프라인
     if not api_key:
-        print("✗ GEMINI_API_KEY가 필요합니다. (환경변수 또는 --api-key)")
+        print("✗ GEMINI_API_KEY 또는 GEMINI_API_KEYS가 필요합니다. (환경변수 또는 --api-key)")
         sys.exit(1)
     from htp_indicator_parser import run_pdf_to_json
     from store_to_chroma import create_vector_db
@@ -56,15 +57,15 @@ def cmd_ingest(args: argparse.Namespace) -> None:
 def cmd_interpret(args: argparse.Namespace) -> None:
     """워크플로우 2: 원본 JSON → 분석 → RAG → LLM → 해석 결과"""
     try:
-        from gemini_integration import analyze_and_interpret, save_results
+        from gemini_integration import analyze_and_interpret, save_results, resolve_gemini_api_key
     except ImportError as e:
         print("✗ gemini_integration을 불러올 수 없습니다. pip install -r requirements.txt")
         print(f"  상세: {e}")
         sys.exit(1)
 
-    api_key = getattr(args, "api_key", None) or os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        print("✗ GEMINI_API_KEY가 필요합니다. (환경변수 또는 --api-key)")
+    api_key = getattr(args, "api_key", None)  # None이면 env에서 키 순환(503 시 다음 키)
+    if not resolve_gemini_api_key(api_key):
+        print("✗ GEMINI_API_KEY 또는 GEMINI_API_KEYS가 필요합니다. (환경변수 또는 --api-key)")
         sys.exit(1)
 
     output_dir = getattr(args, "output", None) or "results"
@@ -107,8 +108,8 @@ def cmd_interpret(args: argparse.Namespace) -> None:
             temperature=getattr(args, "temperature", 0.7),
             use_rag=not getattr(args, "no_rag", False),
             rag_db_path=getattr(args, "rag_db_path", None),
-            rag_k=getattr(args, "rag_k", 10),
-            max_output_tokens=getattr(args, "max_output_tokens", 8192),
+            rag_k=getattr(args, "rag_k", 5),
+            max_output_tokens=getattr(args, "max_output_tokens", 4096),
         )
         elapsed = time.perf_counter() - t0
         return results, elapsed
@@ -193,7 +194,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_ingest.add_argument("--result-dir", default="results", help="지표 JSON 저장 폴더 (기본: results)")
     p_ingest.add_argument("--db-path", default="htp_knowledge_base", help="ChromaDB 저장 경로 (기본: htp_knowledge_base)")
     p_ingest.add_argument("--json", metavar="PATH", help="이미 있는 JSON만 ChromaDB에 적재 (PDF 단계 생략)")
-    p_ingest.add_argument("--api-key", help="Gemini API 키 (미지정 시 GEMINI_API_KEY)")
+    p_ingest.add_argument("--api-key", help="Gemini API 키 (미지정 시 GEMINI_API_KEYS/GEMINI_API_KEY)")
     p_ingest.set_defaults(func=cmd_ingest)
 
     # 2) interpret: 원본 JSON → 분석 → RAG → LLM
@@ -206,7 +207,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_interp.add_argument("-o", "--output", default="results", help="결과 저장 디렉터리 (analysis/interpretation/combined JSON)")
     p_interp.add_argument("-m", "--model", default="gemini-2.5-flash-lite", help="Gemini 모델 (기본: gemini-2.5-flash-lite)")
-    p_interp.add_argument("--api-key", help="Gemini API 키 (미지정 시 GEMINI_API_KEY)")
+    p_interp.add_argument("--api-key", help="Gemini API 키 (미지정 시 GEMINI_API_KEYS/GEMINI_API_KEY)")
     p_interp.add_argument("--temperature", type=float, default=0.2, help="생성 온도 (기본: 0.2)")
     p_interp.add_argument("--no-rag", action="store_true", help="ChromaDB RAG 미사용 (프롬프트 짧아져 속도 향상)")
     p_interp.add_argument("--rag-k", type=int, default=10, help="RAG 검색 상위 k개 (기본: 10). 5로 줄이면 속도 향상")

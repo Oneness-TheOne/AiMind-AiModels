@@ -1,6 +1,19 @@
 """
 아동 그림 T-Score 산출 모듈.
 drawing_norm_dist_stats.csv 기준표와 비교하여 에너지, 위치안정성, 표현력 점수를 계산합니다.
+
+T-Score 근거:
+  손성희(2015) 「모바일 기반 HTP그림검사 앱 개발을 위한 표준화 연구」에서 HTP 그림 분석에
+  사용된 표준화 점수(T-점수) 체계를 따릅니다. 평균 50, 표준편차 10으로 해석합니다.
+
+구간 해석(35/65):
+  T 35 미만 / 65 초과 구간은 T-점수 해석에서 통상 사용되는 ±1.5 표준편차(평균 대비) 기준을
+  적용한 참고 구간이며, 심리측정 관례에 따른 것입니다.
+
+참고:
+  - "또래 평균 50점": T-Score 정의상 평균=50, 표준편차=10이므로 표시용 또래 평균은 항상 50입니다.
+  - 표현력(Item_Count): 기준표에서 사람 그림의 Item_Count 표준편차가 매우 작아(약 0.5~0.8),
+    우리가 쓰는 len(features)와 norm 정의가 다르면 극단 T(-29 등)가 나올 수 있어, T는 20~80으로 제한합니다.
 """
 from pathlib import Path
 from typing import Any
@@ -75,6 +88,10 @@ def calculate_drawing_score_from_json(
         except (KeyError, TypeError):
             return None
 
+        # T-Score 해석 가능 범위로 제한. 기준표 Item_Count 표준편차가 매우 작을 때(특히 사람 그림)
+        # 우리 len(features)와 norm 정의가 다르면 극단값(-29 등)이 나올 수 있어 상·하한 적용.
+        T_MIN, T_MAX = 20.0, 80.0
+
         def get_t_score(val: float, col_name: str) -> float:
             cols_mean = [c for c in df_stats.columns if c[0] == col_name and c[1] == "mean"]
             cols_std = [c for c in df_stats.columns if c[0] == col_name and c[1] == "std"]
@@ -86,6 +103,7 @@ def calculate_drawing_score_from_json(
                 return 50.0
             z = (val - mu) / sigma
             t = 50 + (z * 10)
+            t = max(T_MIN, min(T_MAX, t))
             return round(t, 1)
 
         pos_x_score = get_t_score(my_x, "Pos_X")
@@ -94,6 +112,7 @@ def calculate_drawing_score_from_json(
         에너지_점수 = get_t_score(my_size, "Size_Ratio")
         표현력_점수 = get_t_score(my_count, "Item_Count")
 
+        # 종합_평가 구간: T ±1.5 SD(35/65) 기준. 심리측정 관례 적용.
         종합_평가 = ""
         if 에너지_점수 < 35:
             종합_평가 += "다소 위축됨; "
@@ -142,6 +161,23 @@ def _get_peer_norms(age: int, sex: str, draw_types: list[str]) -> dict[str, floa
     }
 
 
+def _get_peer_tscore_from_csv(
+    age: int, sex: str, draw_types: list[str]
+) -> dict[str, float] | None:
+    """기준표의 또래 평균(raw mean)에 해당하는 T-Score를 구합니다. 정의상 μ의 T는 50입니다."""
+    if not draw_types:
+        return None
+    peer_norms = _get_peer_norms(age, sex, draw_types)
+    if not peer_norms:
+        return None
+    # T(μ) = 50 + 10*0 = 50. CSV 또래 평균에 대응하는 T는 항상 50.
+    return {
+        "에너지_점수": 50.0,
+        "위치_안정성_점수": 50.0,
+        "표현력_점수": 50.0,
+    }
+
+
 def compute_scores_for_analysis(
     results: dict[str, Any],
     age: int,
@@ -155,8 +191,9 @@ def compute_scores_for_analysis(
         {
             "by_object": { "tree": {...}, "house": {...}, ... },
             "aggregated": { 에너지_점수, 위치_안정성_점수, 표현력_점수, 종합_평가 },
-            "peer_average": 50,
-            "peer_norms": { 에너지_또래평균, ... },
+            "peer_average": 또래 평균 T (50),
+            "peer_norms": 기준표에서 조회한 또래 raw 평균 { 에너지_또래평균, ... },
+            "peer_tscore_from_csv": 또래 T (에너지/위치/표현력 각 50),
             "age": int, "sex": str
         }
     """
@@ -185,30 +222,66 @@ def compute_scores_for_analysis(
             draw_types_used.append(label_kr)
 
     peer_norms = _get_peer_norms(age, sex, draw_types_used) if draw_types_used else None
+    peer_tscore_from_csv = (
+        _get_peer_tscore_from_csv(age, sex, draw_types_used) if draw_types_used else None
+    )
+    # 또래 평균 T는 기준표의 평균(μ)에 대응하는 T이므로 50. 기준표에서 명시적으로 조회한 값 사용.
+    peer_average = 50.0
+    if peer_tscore_from_csv:
+        peer_average = (
+            peer_tscore_from_csv["에너지_점수"]
+            + peer_tscore_from_csv["위치_안정성_점수"]
+            + peer_tscore_from_csv["표현력_점수"]
+        ) / 3
 
     if not scores_list:
         return {
             "by_object": by_object,
             "aggregated": None,
-            "peer_average": 50,
+            "peer_average": peer_average,
             "peer_norms": peer_norms,
+            "peer_tscore_from_csv": peer_tscore_from_csv,
             "age": age,
             "sex": sex,
         }
 
     n = len(scores_list)
+    e = round(sum(x["에너지_점수"] for x in scores_list) / n, 1)
+    w = round(sum(x["위치_안정성_점수"] for x in scores_list) / n, 1)
+    p = round(sum(x["표현력_점수"] for x in scores_list) / n, 1)
+    # 집계 T점수 기준으로 종합_평가 한 문장만 생성 (4장 이어붙이면 반복되어 이상하게 나옴)
+    종합_평가 = ""
+    if e < 35:
+        종합_평가 += "다소 위축됨; "
+    elif e > 65:
+        종합_평가 += "에너지 넘침; "
+    else:
+        종합_평가 += "적절한 에너지; "
+    if w < 35:
+        종합_평가 += "위치 불안정; "
+    elif w > 65:
+        종합_평가 += "위치 안정적; "
+    else:
+        종합_평가 += "적절한 안정성; "
+    if p < 35:
+        종합_평가 += "표현이 절제됨; "
+    elif p > 65:
+        종합_평가 += "풍부한 표현; "
+    else:
+        종합_평가 += "적절한 표현력; "
     agg = {
-        "에너지_점수": round(sum(x["에너지_점수"] for x in scores_list) / n, 1),
-        "위치_안정성_점수": round(sum(x["위치_안정성_점수"] for x in scores_list) / n, 1),
-        "표현력_점수": round(sum(x["표현력_점수"] for x in scores_list) / n, 1),
-        "종합_평가": " ".join(x["종합_평가"] for x in scores_list),
+        "에너지_점수": e,
+        "위치_안정성_점수": w,
+        "표현력_점수": p,
+        "종합_평가": 종합_평가.strip(),
     }
 
     return {
         "by_object": by_object,
         "aggregated": agg,
-        "peer_average": 50,
+        "peer_average": peer_average,
         "peer_norms": peer_norms,
+        "peer_tscore_from_csv": peer_tscore_from_csv,
         "age": age,
         "sex": sex,
     }

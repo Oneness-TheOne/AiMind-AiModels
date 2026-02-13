@@ -3,6 +3,7 @@ import os
 from dotenv import load_dotenv
 from tqdm import tqdm
 
+from gemini_integration import resolve_gemini_api_key
 from langchain_chroma import Chroma
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_core.documents import Document
@@ -20,9 +21,13 @@ def create_vector_db(json_file, db_path=None):
     with open(json_file, "r", encoding="utf-8") as f:
         data = json.load(f)
 
+    api_key = resolve_gemini_api_key()
+    if not api_key:
+        print("❌ GEMINI_API_KEY 또는 GEMINI_API_KEYS가 필요합니다.")
+        return None
     embeddings = GoogleGenerativeAIEmbeddings(
         model="models/embedding-001",
-        google_api_key=os.getenv("GEMINI_API_KEY")
+        google_api_key=api_key
     )
 
     documents = []

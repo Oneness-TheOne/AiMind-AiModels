@@ -34,6 +34,7 @@ os.environ.setdefault("UVICORN_PORT", aimodels_port)
 
 app = FastAPI()
 
+
 BASE_DIR = Path(current_dir)
 # 그림 분석(/analyze) 전용 경로
 IMAGE_TO_JSON_DIR = BASE_DIR / "image_to_json"
@@ -281,13 +282,13 @@ async def analyze(
         raise HTTPException(status_code=500, detail=f"image_to_json 로딩 실패: {e}")
 
     try:
-        from gemini_integration import analyze_and_interpret
+        from gemini_integration import analyze_and_interpret, generate_overall_psychology, resolve_gemini_api_key
         from legacy_converter import is_new_format, convert_new_to_legacy
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"jsonToLlm 로딩 실패: {e}")
 
-    if not os.getenv("GEMINI_API_KEY"):
-        raise HTTPException(status_code=400, detail="GEMINI_API_KEY가 필요합니다.")
+    if not resolve_gemini_api_key():
+        raise HTTPException(status_code=400, detail="GEMINI_API_KEY 또는 GEMINI_API_KEYS가 필요합니다.")
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     gender_kr = _normalize_gender(child_gender)
@@ -340,7 +341,7 @@ async def analyze(
         interp_results = analyze_and_interpret(
             original,
             model_name="gemini-2.5-flash-lite",
-            api_key=os.getenv("GEMINI_API_KEY"),
+            api_key=None,  # env에서 GEMINI_API_KEYS/GEMINI_API_KEY 사용 (503 시 키 순환)
             temperature=0.2,
             use_rag=True,
             rag_db_path=str(JSON_TO_LLM_DIR / "htp_knowledge_base"),
@@ -399,8 +400,91 @@ async def analyze(
         # T-Score 기반 drawing_norm_dist_stats 비교 점수 (에너지/위치안정성/표현력)
         drawing_scores = compute_drawing_scores(results, age_int, gender_kr)
         comparison["drawing_scores"] = drawing_scores
+        # T-Score 기반 종합 점수·발달 단계·정서 상태 (프론트 요약 카드 연동)
+        agg = drawing_scores.get("aggregated") if drawing_scores else None
+        if agg:
+            avg_t = (
+                agg["에너지_점수"] + agg["위치_안정성_점수"] + agg["표현력_점수"]
+            ) / 3
+            comparison["overall_score"] = round(avg_t, 1)
+            if avg_t >= 55:
+                stage = "정상 발달"
+            elif avg_t >= 35:
+                stage = "보통 발달"
+            else:
+                stage = "지원이 필요한 영역 있음"
+            if "development" not in comparison:
+                comparison["development"] = {}
+            comparison["development"]["stage"] = stage
+            raw_emotional = (agg.get("종합_평가") or "").strip()
+            comparison["emotional_state"] = raw_emotional or "분석 완료"
 
-    return {
+    # Aggregate recommendation items from 4 drawings by category (LLM outputs Korean keys)
+    LLM_CATEGORY_KEYS = ("정서_심리_지원", "대인관계_사회성", "양육_일상_활동")
+    CATEGORY_EN = ("emotional_psychological_support", "interpersonal_social", "parenting_daily_activities")
+    by_category = {k: [] for k in CATEGORY_EN}
+    legacy_items = []
+
+    def _norm(s):
+        if isinstance(s, str) and s.strip():
+            return s.strip()
+        if isinstance(s, dict) and s.get("내용"):
+            return str(s["내용"]).strip()
+        return None
+
+    for key in ("tree", "house", "man", "woman"):
+        interp = (results.get(key) or {}).get("interpretation")
+        if not interp or not isinstance(interp, dict):
+            continue
+        rec = interp.get("추천_사항")
+        if not isinstance(rec, dict):
+            continue
+        for i, llm_key in enumerate(LLM_CATEGORY_KEYS):
+            if rec.get(llm_key):
+                for x in rec[llm_key]:
+                    v = _norm(x)
+                    if v and v not in by_category[CATEGORY_EN[i]]:
+                        by_category[CATEGORY_EN[i]].append(v)
+        if rec.get("항목"):
+            for x in rec["항목"]:
+                v = _norm(x)
+                if v:
+                    legacy_items.append(v)
+
+    if any(by_category[k] for k in CATEGORY_EN):
+        recommendations_payload = [
+            {"category": cat_en, "items": by_category[cat_en]}
+            for cat_en in CATEGORY_EN
+            if by_category[cat_en]
+        ]
+    else:
+        recommendations_payload = (
+            [{"category": "analysis_based", "items": legacy_items}] if legacy_items else []
+        )
+
+    # 심리 해석(results)과 함께 전체 심리 결과 4개 필드 생성 (구조 고정: 종합/인상적/구조적/표상적)
+    전체_심리_결과 = {
+        "종합_요약": "",
+        "인상적_분석": "",
+        "구조적_분석_요약": "",
+        "표상적_분석_종합": "",
+    }
+    # 분석 결과(results)를 보내고 전체 심리 결과 4필드를 같이 요청·수신 (요약이 아닌 분석 기반 작성)
+    try:
+        overall = generate_overall_psychology(
+            results, child_name, age_str, gender_kr,
+            api_key=None,  # env에서 GEMINI_API_KEYS/GEMINI_API_KEY 사용 (503 시 키 순환)
+            rag_db_path=str(JSON_TO_LLM_DIR / "htp_knowledge_base"),
+        )
+        if overall and isinstance(overall, dict):
+            전체_심리_결과["종합_요약"] = (overall.get("종합_요약") or "").strip()
+            전체_심리_결과["인상적_분석"] = (overall.get("인상적_분석") or "").strip()
+            전체_심리_결과["구조적_분석_요약"] = (overall.get("구조적_분석_요약") or "").strip()
+            전체_심리_결과["표상적_분석_종합"] = (overall.get("표상적_분석_종합") or "").strip()
+    except Exception as e:
+        print(f"[analyze] 전체 심리 결과 생성 실패(무시): {e}")
+
+    payload = {
         "success": True,
         "child": {
             "name": child_name,
@@ -409,7 +493,39 @@ async def analyze(
         },
         "results": results,
         "comparison": comparison,
+        "recommendations": recommendations_payload,
+        "전체_심리_결과": 전체_심리_결과,
     }
+
+    # 전체결과 JSON 저장 (그림별_해석 + 전체_심리_결과)
+    try:
+        그림별_해석 = {
+            "나무": (results.get("tree") or {}).get("interpretation"),
+            "집": (results.get("house") or {}).get("interpretation"),
+            "남자사람": (results.get("man") or {}).get("interpretation"),
+            "여자사람": (results.get("woman") or {}).get("interpretation"),
+        }
+        save_obj = {
+            "child": payload["child"],
+            "그림별_해석": 그림별_해석,
+            "comparison": comparison,
+            "전체_심리_결과": 전체_심리_결과,
+        }
+        def _strip_base64(obj):
+            if isinstance(obj, dict):
+                return {k: None if k == "box_image_base64" else _strip_base64(v) for k, v in obj.items()}
+            if isinstance(obj, list):
+                return [_strip_base64(x) for x in obj]
+            return obj
+        save_obj = _strip_base64(save_obj)
+        safe_name = (child_name or "분석").strip() or "분석"
+        safe_name = "".join(c if c.isalnum() or c in "._-" else "_" for c in safe_name)[:50]
+        full_path = JSON_TO_LLM_RESULTS_DIR / f"전체결과_{safe_name}_{timestamp}.json"
+        full_path.write_text(json.dumps(save_obj, ensure_ascii=False, indent=2), encoding="utf-8")
+    except Exception as e:
+        print(f"[analyze] 전체결과 JSON 저장 실패(무시): {e}")
+
+    return payload
 
 
 @app.post("/analyze/score")

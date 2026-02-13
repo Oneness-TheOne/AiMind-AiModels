@@ -9,6 +9,8 @@
 """
 import argparse
 import json
+import os
+import platform
 import sys
 from pathlib import Path
 
@@ -207,6 +209,70 @@ def build_rag_output(r, path: Path, object_type: str, weights: Path, w: int, h: 
     }
 
 
+def _get_korean_font(size: int = 18):
+    """한글을 지원하는 PIL 폰트 반환. OS별 경로 순서로 시도."""
+    from PIL import ImageFont
+
+    def try_load(paths):
+        for path in paths:
+            if Path(path).exists():
+                try:
+                    return ImageFont.truetype(path, size)
+                except Exception:
+                    continue
+        return None
+
+    script_dir = Path(__file__).resolve().parent
+    win_fonts = Path(os.environ.get("WINDIR", "C:\\Windows")) / "Fonts"
+    if not win_fonts.exists():
+        win_fonts = Path("C:/Windows/Fonts")
+
+    # 프로젝트 번들
+    p = script_dir / "fonts" / "NanumGothic.ttf"
+    if p.exists():
+        try:
+            return ImageFont.truetype(str(p), size)
+        except Exception:
+            pass
+
+    # Windows
+    if platform.system() == "Windows":
+        for name in ("malgun.ttf", "gulim.ttc", "batang.ttc"):
+            path = win_fonts / name
+            if path.exists():
+                try:
+                    return ImageFont.truetype(str(path), size)
+                except Exception:
+                    continue
+
+    # macOS
+    if platform.system() == "Darwin":
+        ttc_path = "/System/Library/Fonts/AppleSDGothicNeo.ttc"
+        if Path(ttc_path).exists():
+            try:
+                return ImageFont.truetype(ttc_path, size)
+            except Exception:
+                pass
+        for path in ("/System/Library/Fonts/Supplemental/AppleGothic.ttf", "/Library/Fonts/AppleGothic.ttf"):
+            if Path(path).exists():
+                try:
+                    return ImageFont.truetype(path, size)
+                except Exception:
+                    continue
+
+    # Linux
+    linux_fonts = [
+        "/usr/share/fonts/truetype/nanum/NanumGothic.ttf",
+        "/usr/share/fonts/truetype/nanum/NanumBarunGothic.ttf",
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+    ]
+    font = try_load(linux_fonts)
+    if font:
+        return font
+
+    return ImageFont.load_default()
+
+
 def _save_annotated_image(r, output_image: Path, object_type: str = "tree") -> None:
     """커스텀 annotate: 박스 + 단색 마스크 + 한글 클래스명 (확률 제외)"""
     output_image.parent.mkdir(parents=True, exist_ok=True)
@@ -256,6 +322,10 @@ def _save_annotated_image(r, output_image: Path, object_type: str = "tree") -> N
             overlay[mask_bool] = color
             cv2.addWeighted(overlay, 0.4, img, 0.6, 0, img)
 
+    # 한글 폰트 (한 번만 로드)
+    from PIL import Image, ImageDraw, ImageFont
+    font = _get_korean_font(size=18)
+
     # 박스 그리기 + 한글 클래스명 표시
     for i in range(len(clss)):
         cid = int(clss[i])
@@ -270,31 +340,16 @@ def _save_annotated_image(r, output_image: Path, object_type: str = "tree") -> N
 
         # 한글 라벨 배경
         label = kr_name
-        font_scale = 0.6
-        thickness = 2
-        (w, h), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, font_scale, thickness)
+        bbox = font.getbbox(label)
+        w_font = bbox[2] - bbox[0]
+        h_font = bbox[3] - bbox[1]
+        pad = 10
+        cv2.rectangle(img, (x1, y1 - h_font - pad), (x1 + w_font + pad, y1), color, -1)
 
-        # 라벨 배경 사각형
-        cv2.rectangle(img, (x1, y1 - h - 10), (x1 + w + 10, y1), color, -1)
-
-        # 한글 텍스트 (PIL 사용)
-        from PIL import Image, ImageDraw, ImageFont
+        # 한글 텍스트 (PIL)
         img_pil = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
         draw = ImageDraw.Draw(img_pil)
-
-        # 기본 폰트 사용 (한글 지원)
-        try:
-            # Windows: 맑은 고딕
-            font = ImageFont.truetype("malgun.ttf", 16)
-        except:
-            try:
-                # Mac/Linux: 나눔고딕
-                font = ImageFont.truetype("/usr/share/fonts/truetype/nanum/NanumGothic.ttf", 16)
-            except:
-                # 기본 폰트
-                font = ImageFont.load_default()
-
-        draw.text((x1 + 5, y1 - h - 5), label, font=font, fill=(255, 255, 255))
+        draw.text((x1 + 5, y1 - h_font - 5), label, font=font, fill=(255, 255, 255))
 
         # PIL -> OpenCV
         img = cv2.cvtColor(np.array(img_pil), cv2.COLOR_RGB2BGR)

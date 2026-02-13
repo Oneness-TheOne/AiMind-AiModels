@@ -27,6 +27,51 @@ except ImportError:
 
 DEFAULT_MODEL = "gemini-2.5-flash-lite"
 
+# interpret_with_gemini 전용: 503/429 등 일시 오류 시 재시도
+GEMINI_RETRY_MAX = 5
+GEMINI_RETRY_BACKOFF_SEC = 2
+
+
+def _get_gemini_api_keys():
+    """
+    GEMINI_API_KEYS(쉼표 구분) 또는 GEMINI_API_KEY에서 키 목록 반환.
+    """
+    keys_str = os.getenv("GEMINI_API_KEYS", "").strip()
+    if keys_str:
+        keys = [k.strip() for k in keys_str.split(",") if k.strip()]
+        if keys:
+            return keys
+    single = os.getenv("GEMINI_API_KEY", "").strip()
+    return [single] if single else []
+
+
+def resolve_gemini_api_key(api_key=None, index=0):
+    """
+    사용할 API 키 결정. api_key가 주어지면 그대로 사용, 아니면 env에서 가져옴.
+    index: 503 재시도 시 다음 키 선택용 (GEMINI_API_KEYS일 때)
+    """
+    if api_key:
+        return api_key
+    keys = _get_gemini_api_keys()
+    if not keys:
+        return None
+    return keys[index % len(keys)]
+
+
+def _is_retryable_gemini_error(e):
+    """503, 429, JSON 파싱 실패 등 재시도 가능 오류 여부 (interpret_with_gemini용)."""
+    if isinstance(e, json.JSONDecodeError):
+        return True
+    msg = str(e).upper()
+    return (
+        "503" in msg
+        or "429" in msg
+        or "UNAVAILABLE" in msg
+        or "RESOURCE_EXHAUSTED" in msg
+        or "OVERLOADED" in msg
+    )
+
+
 # RAG용 ChromaDB (store_to_chroma.py와 동일 경로·임베딩)
 HTP_DB_PATH = "./htp_knowledge_base"
 try:
@@ -42,17 +87,16 @@ def setup_gemini(api_key=None):
     Gemini API 클라이언트 생성 (google.genai SDK 사용).
     
     Args:
-        api_key: Gemini API 키 (없으면 환경변수 GEMINI_API_KEY 사용)
+        api_key: Gemini API 키 (없으면 GEMINI_API_KEYS/GEMINI_API_KEY에서 가져옴)
     """
     if not GEMINI_AVAILABLE:
         raise ImportError("google-genai 패키지가 필요합니다. pip install google-genai")
     
-    if api_key is None:
-        api_key = os.getenv('GEMINI_API_KEY')
-        if api_key is None:
-            raise ValueError("API 키가 필요합니다. api_key 파라미터로 전달하거나 GEMINI_API_KEY 환경변수를 설정하세요.")
+    resolved = resolve_gemini_api_key(api_key)
+    if not resolved:
+        raise ValueError("API 키가 필요합니다. GEMINI_API_KEYS 또는 GEMINI_API_KEY 환경변수를 설정하세요.")
     
-    return genai.Client(api_key=api_key)
+    return genai.Client(api_key=resolved)
 
 
 def _build_rag_query_from_analysis(analysis_data):
@@ -120,7 +164,7 @@ def get_rag_context(analysis_data, db_path=None, api_key=None, k=10):
     db_path = db_path or HTP_DB_PATH
     if not os.path.isdir(db_path):
         return "", []
-    api_key = api_key or os.getenv("GEMINI_API_KEY")
+    api_key = resolve_gemini_api_key(api_key)
     if not api_key:
         return "", []
     try:
@@ -155,7 +199,54 @@ def get_rag_context(analysis_data, db_path=None, api_key=None, k=10):
         return "", []
 
 
-def interpret_with_gemini(analysis_result, model_name=None, api_key=None, temperature=0.2, use_rag=True, rag_db_path=None, rag_k=10, max_output_tokens=8192):
+def get_rag_context_by_query(query_string, db_path=None, api_key=None, k=10):
+    """
+    쿼리 문자열로 ChromaDB 검색 후 (참고 문자열, 참고 논문 목록) 반환.
+    종합 심리 등 분석 결과 없이 RAG만으로 컨텍스트를 가져올 때 사용.
+
+    Returns:
+        tuple: (rag_context_str, references) — get_rag_context와 동일 형식
+    """
+    if not RAG_AVAILABLE or not (query_string and query_string.strip()):
+        return "", []
+    db_path = db_path or HTP_DB_PATH
+    if not os.path.isdir(db_path):
+        return "", []
+    api_key = resolve_gemini_api_key(api_key)
+    if not api_key:
+        return "", []
+    try:
+        embeddings = GoogleGenerativeAIEmbeddings(
+            model="models/embedding-001",
+            google_api_key=api_key,
+        )
+        vector_db = Chroma(
+            persist_directory=db_path,
+            embedding_function=embeddings,
+        )
+        docs = vector_db.similarity_search(query_string.strip(), k=k)
+        lines = []
+        seen_sources = []
+        for i, doc in enumerate(docs, 1):
+            lines.append(f"[지표 {i}]")
+            lines.append(doc.page_content.strip())
+            src = doc.metadata.get(SOURCE_FIELD, "")
+            page = doc.metadata.get("page", "").strip()
+            if src:
+                out = f"(출처: {src}"
+                if page:
+                    out += f", p.{page}"
+                out += ")"
+                lines.append(out)
+                if src not in seen_sources:
+                    seen_sources.append(src)
+            lines.append("")
+        return "\n".join(lines).strip(), seen_sources
+    except Exception:
+        return "", []
+
+
+def interpret_with_gemini(analysis_result, model_name=None, api_key=None, temperature=0.2, use_rag=True, rag_db_path=None, rag_k=5, max_output_tokens=4096):
     """
     Gemini를 사용하여 분석 결과를 해석.
     use_rag=True이면 ChromaDB에서 관련 HTP 지표를 먼저 검색해 프롬프트에 넣고( RAG ), 그 위에 해석을 요청해 토큰을 아끼고 근거를 반영한다.
@@ -167,8 +258,8 @@ def interpret_with_gemini(analysis_result, model_name=None, api_key=None, temper
         temperature: 생성 온도 (0.0 ~ 1.0, 기본값: 0.7) 0.1 또는 0.2로 설정하는 것이 좋음
         use_rag: True이면 ChromaDB에서 참고 지표 검색 후 프롬프트에 포함 (기본값: True)
         rag_db_path: ChromaDB persist 디렉터리 (None이면 HTP_DB_PATH)
-        rag_k: RAG 검색 상위 k개 (기본값: 10). 줄이면(예: 5) 프롬프트 짧아져 LLM 속도 향상
-        max_output_tokens: LLM 최대 출력 토큰 (기본값: 8192). 줄이면(예: 4096) 생성 속도 향상
+        rag_k: RAG 검색 상위 k개 (기본값: 5). 늘리면 참고 지표 많아지고, 줄이면 LLM 속도 향상
+        max_output_tokens: LLM 최대 출력 토큰 (기본값: 4096). 늘리면 해석 잘림 방지, 줄이면 생성 속도 향상
     
     Returns:
         해석 결과 (딕셔너리). 성공 시 "timing" 키로 { "rag_sec", "llm_sec" } 포함
@@ -176,16 +267,15 @@ def interpret_with_gemini(analysis_result, model_name=None, api_key=None, temper
     timing = {"rag_sec": 0.0, "llm_sec": 0.0}
     if model_name is None:
         model_name = DEFAULT_MODEL
-    # Gemini 클라이언트 (google.genai SDK)
-    client = setup_gemini(api_key)
-    
+
     # RAG: 분석 결과로 ChromaDB 검색 후 참고 지표 문자열·참고 논문 목록 생성
     rag_context = ""
     references = []
     if use_rag:
         t0 = time.perf_counter()
         analysis_data = json.loads(analysis_result) if isinstance(analysis_result, str) else analysis_result
-        rag_context, references = get_rag_context(analysis_data, db_path=rag_db_path, api_key=api_key, k=rag_k)
+        rag_key = resolve_gemini_api_key(api_key, 0)
+        rag_context, references = get_rag_context(analysis_data, db_path=rag_db_path, api_key=rag_key, k=rag_k)
         timing["rag_sec"] = time.perf_counter() - t0
     
     # 프롬프트 생성 (RAG 컨텍스트·참고 논문 목록 있으면 참고 지표 + 항목별 출처 요청)
@@ -202,20 +292,55 @@ def interpret_with_gemini(analysis_result, model_name=None, api_key=None, temper
         top_k=40,
         max_output_tokens=max_output_tokens,
     )
-    
+
+    response_text = None
+    last_error = None
+    for attempt in range(GEMINI_RETRY_MAX):
+        # 503/429 시 다음 키로 전환 (GEMINI_API_KEYS가 여러 개일 때)
+        current_key = resolve_gemini_api_key(api_key, attempt)
+        if not current_key:
+            return {
+                "success": False,
+                "error": "API 키가 필요합니다. GEMINI_API_KEYS 또는 GEMINI_API_KEY를 설정하세요.",
+                "references": references,
+                "timing": timing,
+                "raw_response": None,
+            }
+        client = setup_gemini(current_key)
+        try:
+            t0 = time.perf_counter()
+            response = client.models.generate_content(
+                model=model_name,
+                contents=prompt,
+                config=config,
+            )
+            timing["llm_sec"] = time.perf_counter() - t0
+            response_text = response.text if hasattr(response, "text") and response.text else ""
+            last_error = None
+            break
+        except Exception as e:
+            last_error = e
+            if not _is_retryable_gemini_error(e) or attempt == GEMINI_RETRY_MAX - 1:
+                return {
+                    "success": False,
+                    "error": f"Gemini API 오류: {str(e)}",
+                    "references": references,
+                    "timing": timing,
+                    "raw_response": None,
+                }
+            wait_sec = GEMINI_RETRY_BACKOFF_SEC * (2 ** attempt)
+            time.sleep(wait_sec)
+
+    if response_text is None:
+        return {
+            "success": False,
+            "error": f"Gemini API 오류: {str(last_error)}",
+            "references": references,
+            "timing": timing,
+            "raw_response": None,
+        }
+
     try:
-        # Gemini에 요청 (가장 시간 많이 소요)
-        t0 = time.perf_counter()
-        response = client.models.generate_content(
-            model=model_name,
-            contents=prompt,
-            config=config,
-        )
-        timing["llm_sec"] = time.perf_counter() - t0
-        
-        # 응답 텍스트 추출 (google.genai SDK는 response.text)
-        response_text = response.text if hasattr(response, "text") and response.text else ""
-        
         # JSON 파싱 시도
         try:
             text = response_text.strip()
@@ -297,7 +422,176 @@ def interpret_with_gemini(analysis_result, model_name=None, api_key=None, temper
         }
 
 
-def analyze_and_interpret(json_data, model_name=None, api_key=None, temperature=0.2, use_rag=True, rag_db_path=None, rag_k=10, max_output_tokens=8192):
+def _build_interpretations_summary(results):
+    """results에서 그림별 해석(interpretation)을 추출해 종합용 요약 문자열 생성."""
+    label_map = {"tree": "나무", "house": "집", "man": "남자사람", "woman": "여자사람"}
+    extract_keys = ("인상적_해석", "구조적_해석", "표상적_해석", "정서_영역_소견")
+    parts = []
+    for en_key in ("tree", "house", "man", "woman"):
+        r = results.get(en_key) if isinstance(results, dict) else None
+        interp = (r or {}).get("interpretation") if isinstance(r, dict) else None
+        if not interp or not isinstance(interp, dict):
+            continue
+        label = label_map.get(en_key, en_key)
+        lines = [f"[{label} 해석]"]
+        for key in extract_keys:
+            val = interp.get(key)
+            if isinstance(val, str) and val.strip():
+                lines.append(f"- {key}: {val.strip()}")
+            elif isinstance(val, dict):
+                for k, v in val.items():
+                    if isinstance(v, str) and v.strip():
+                        lines.append(f"- {k}: {v.strip()}")
+        if len(lines) > 1:
+            parts.append("\n".join(lines))
+    return "\n\n".join(parts) if parts else ""
+
+
+def _call_name_with_ui(full_name: str) -> str:
+    """
+    풀네임을 호칭+의 형태(예: O이의)로 변환.
+    한글 마지막 글자 받침 있으면 '이의', 없으면 '의'.
+    """
+    s = (full_name or "").strip()
+    for suf in ("님", "군", "양"):
+        if s.endswith(suf):
+            s = s[: -len(suf)].strip()
+    if not s or s == "아이":
+        return "아이의"
+    given = s[1:] if len(s) > 1 else s
+    if not given:
+        return "아이의"
+    last = given[-1]
+    code = ord(last)
+    has_batchim = (
+        0xAC00 <= code <= 0xD7A3 and (code - 0xAC00) % 28 != 0
+    )
+    return given + ("이의" if has_batchim else "의")
+
+
+def generate_overall_psychology(results, child_name, age_str, gender_kr, api_key=None, model_name=None, use_rag=True, rag_db_path=None, rag_k=10):
+    """
+    RAG(ChromaDB)로 HTP 참고 지표를 검색한 뒤, 그림별 해석(interpretation)을 바탕으로
+    전체_심리_결과 4개 필드를 한 번에 생성합니다.
+    """
+    default_out = {
+        "종합_요약": "",
+        "인상적_분석": "",
+        "구조적_분석_요약": "",
+        "표상적_분석_종합": "",
+    }
+    if not GEMINI_AVAILABLE:
+        print("[generate_overall_psychology] google-genai 미설치로 스킵")
+        return default_out
+
+    # 그림별 해석 요약 (종합의 핵심 입력)
+    interpretations_summary = _build_interpretations_summary(results)
+
+    # RAG 쿼리: 네 그림 분석이 있으면 합쳐서, 없으면 종합용 고정 쿼리
+    query_parts = []
+    for en_key in ("tree", "house", "man", "woman"):
+        r = results.get(en_key) if isinstance(results, dict) else None
+        analysis = (r or {}).get("analysis") if isinstance(r, dict) else None
+        if analysis and isinstance(analysis, dict):
+            query_parts.append(_build_rag_query_from_analysis(analysis))
+    combined_query = " ".join(p for p in query_parts if p).strip() or "HTP 나무 집 남자사람 여자사람 종합 심리 해석"
+
+    rag_context = ""
+    if use_rag and RAG_AVAILABLE:
+        rag_context, _ = get_rag_context_by_query(combined_query, db_path=rag_db_path, api_key=api_key, k=rag_k)
+
+    model_name = model_name or DEFAULT_MODEL
+    age = age_str or "0"
+    sex = "남아" if gender_kr == "남" else "여아" if gender_kr == "여" else "아동"
+    child_name = (child_name or "").strip()
+    name_part = f"{child_name} " if child_name else ""
+    call_name_ui = _call_name_with_ui(child_name) if child_name else "아이의"
+
+    # 프롬프트: 그림별 해석을 반드시 포함 (종합의 근거)
+    interp_block = f"\n[그림별 해석]\n{interpretations_summary}\n\n" if interpretations_summary.strip() else ""
+    rag_block = f"\n[참고 지표]\n{rag_context}\n\n" if rag_context.strip() else ""
+
+    prompt = f"""{name_part}{age}세 {sex}의 HTP 네 그림(나무, 집, 남자사람, 여자사람)에 대한 **종합** 심리 결과 4개 필드를 작성해주세요.
+{interp_block}{rag_block}
+**요청**:
+- 위 그림별 해석을 **반드시 종합**하여 전체 심리 결과를 작성하세요.
+- 아동을 지칭할 때는 반드시 "{call_name_ui}" 형태로만 쓸 것. 예: "{call_name_ui} 그림에서", "{call_name_ui} 그림 전반에서". "{child_name} 아동", "{child_name} 아동의" 같은 표현은 사용하지 마세요.
+- "종합_요약", "인상적_분석", "표상적_분석_종합"은 **서로 다른 관점·다른 문장**으로 쓸 것. 같은 문장 반복 금지.
+- "구조적_분석_요약"은 빈 문자열 "" 로 두세요.
+
+**아래 4개 키만 가진 JSON 하나만** 출력하세요. 다른 설명·마크다운 없이 JSON만 출력합니다.
+
+출력 구조 (키 이름 그대로):
+- "종합_요약": 전체 심리·정서·발달 종합 한 문단 (2~3문장)
+- "인상적_분석": 인상적 관점 한 문단 (2~3문장)
+- "구조적_분석_요약": ""
+- "표상적_분석_종합": 표상적 관점 한 문단 (2~3문장)
+"""
+
+    config = types.GenerateContentConfig(
+        temperature=0.3,
+        top_p=0.95,
+        top_k=40,
+        max_output_tokens=1024,
+    )
+
+    last_error = None
+    for attempt in range(GEMINI_RETRY_MAX):
+        current_key = resolve_gemini_api_key(api_key, attempt)
+        if not current_key:
+            print("[generate_overall_psychology] API 키 없음")
+            return default_out
+        try:
+            client = setup_gemini(current_key)
+            response = client.models.generate_content(
+                model=model_name,
+                contents=prompt,
+                config=config,
+            )
+            text = (response.text or "").strip()
+            if not text:
+                print("[generate_overall_psychology] Gemini 응답 텍스트 없음")
+                return default_out
+            if "```" in text:
+                for part in text.split("```"):
+                    part = part.strip()
+                    if part.startswith("json"):
+                        part = part[3:].strip()
+                    if part.startswith("{"):
+                        text = part
+                        break
+            if not text.startswith("{"):
+                start = text.find("{")
+                if start >= 0:
+                    depth, end = 0, -1
+                    for i in range(start, len(text)):
+                        if text[i] == "{": depth += 1
+                        elif text[i] == "}": depth -= 1
+                        if depth == 0: end = i; break
+                    if end >= start:
+                        text = text[start : end + 1]
+            parsed = json.loads(text)
+            if isinstance(parsed, dict):
+                return {
+                    "종합_요약": (parsed.get("종합_요약") or "").strip(),
+                    "인상적_분석": (parsed.get("인상적_분석") or "").strip(),
+                    "구조적_분석_요약": (parsed.get("구조적_분석_요약") or "").strip(),
+                    "표상적_분석_종합": (parsed.get("표상적_분석_종합") or "").strip(),
+                }
+            print("[generate_overall_psychology] 응답이 JSON 객체가 아님")
+            return default_out
+        except Exception as e:
+            last_error = e
+            if _is_retryable_gemini_error(e) and attempt < GEMINI_RETRY_MAX - 1:
+                wait_sec = GEMINI_RETRY_BACKOFF_SEC * (2 ** attempt)
+                time.sleep(wait_sec)
+                continue
+            print(f"[generate_overall_psychology] 실패: {e}")
+            return default_out
+    return default_out
+
+
+def analyze_and_interpret(json_data, model_name=None, api_key=None, temperature=0.2, use_rag=True, rag_db_path=None, rag_k=5, max_output_tokens=4096):
     """
     JSON 데이터를 분석하고 Gemini로 해석하는 통합 함수.
     use_rag=True이면 ChromaDB에서 관련 HTP 지표를 검색해 RAG로 프롬프트에 넣은 뒤 해석한다.
@@ -309,8 +603,8 @@ def analyze_and_interpret(json_data, model_name=None, api_key=None, temperature=
         temperature: 생성 온도 (0.0 ~ 1.0, 기본값: 0.7)
         use_rag: True이면 ChromaDB 참고 지표 검색 후 프롬프트에 포함 (기본값: True)
         rag_db_path: ChromaDB persist 디렉터리 (None이면 HTP_DB_PATH)
-        rag_k: RAG 검색 상위 k개 (기본값: 10). 줄이면 속도 향상
-        max_output_tokens: LLM 최대 출력 토큰 (기본값: 8192). 줄이면 속도 향상
+        rag_k: RAG 검색 상위 k개 (기본값: 5). 늘리면 참고 지표 증가
+        max_output_tokens: LLM 최대 출력 토큰 (기본값: 4096). 늘리면 해석 잘림 방지
     
     Returns:
         {
@@ -383,14 +677,13 @@ def analyze_and_interpret(json_data, model_name=None, api_key=None, temperature=
 def save_results(results, output_dir="results"):
     """
     분석 및 해석 결과를 파일로 저장
-    
+
     Args:
         results: analyze_and_interpret()의 결과
         output_dir: 저장할 디렉토리
     """
-    import os
     from datetime import datetime
-    
+
     os.makedirs(output_dir, exist_ok=True)
     
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")

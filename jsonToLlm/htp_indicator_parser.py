@@ -156,9 +156,10 @@ def run_pdf_to_json(thesis_dir="thesis", result_dir="results", api_key=None):
     thesis_dir 내 PDF를 청킹·지표 추출 후 result_dir에 JSON 저장.
     Returns: 저장된 JSON 파일 경로. PDF 없으면 None.
     """
-    api_key = api_key or os.getenv("GEMINI_API_KEY")
+    from gemini_integration import resolve_gemini_api_key
+    api_key = resolve_gemini_api_key(api_key)
     if not api_key:
-        print("❌ GEMINI_API_KEY가 필요합니다.")
+        print("❌ GEMINI_API_KEY 또는 GEMINI_API_KEYS가 필요합니다.")
         return None
     pdf_files = glob.glob(os.path.join(thesis_dir, "*.pdf"))
     if not pdf_files:
